@@ -1,4 +1,5 @@
 // frontend/src/pages/Dashboard.tsx
+// REEMPLAZAR COMPLETAMENTE EL ARCHIVO
 
 import { useEffect, useState } from "react";
 
@@ -11,22 +12,40 @@ import {
     CandleResponse,
 } from "../api/market";
 
+import {
+    getStructure,
+    MarketStructure,
+} from "../api/smartMoney";
+
 import StatusCard from "../components/StatusCard";
 import TickCard from "../components/TickCard";
-import ChartCard from "../components/ChartCard";
+import TradingChart from "../components/TradingChart";
 
 export default function Dashboard() {
 
-    const [status, setStatus] = useState<TerminalStatus | null>(null);
-    const [tick, setTick] = useState<TickResponse | null>(null);
-    const [candles, setCandles] = useState<CandleResponse[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [status, setStatus] =
+        useState<TerminalStatus | null>(null);
+
+    const [tick, setTick] =
+        useState<TickResponse | null>(null);
+
+    const [candles, setCandles] =
+        useState<CandleResponse[]>([]);
+
+    const [structure, setStructure] =
+        useState<MarketStructure | null>(null);
+
+    const [loading, setLoading] =
+        useState(true);
 
     useEffect(() => {
 
         load();
 
-        const timer = setInterval(load, 1000);
+        const timer = setInterval(
+            load,
+            1000
+        );
 
         return () => clearInterval(timer);
 
@@ -36,13 +55,25 @@ export default function Dashboard() {
 
         try {
 
-            const [statusData, tickData, candleData] = await Promise.all([
+            const [
+
+                statusData,
+
+                tickData,
+
+                candleData,
+
+                structureData,
+
+            ] = await Promise.all([
 
                 getStatus(),
 
                 getTick(),
 
                 getCandles("M5", 300),
+
+                getStructure(),
 
             ]);
 
@@ -52,11 +83,17 @@ export default function Dashboard() {
 
             setCandles(candleData);
 
-        } catch (error) {
+            setStructure(structureData);
+
+        }
+
+        catch (error) {
 
             console.error(error);
 
-        } finally {
+        }
+
+        finally {
 
             setLoading(false);
 
@@ -70,14 +107,14 @@ export default function Dashboard() {
 
             <div
                 style={{
-                    background: "#0f172a",
-                    color: "white",
-                    minHeight: "100vh",
+                    height: "100vh",
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
-                    fontFamily: "Segoe UI",
+                    background: "#0f172a",
+                    color: "white",
                     fontSize: 22,
+                    fontFamily: "Segoe UI",
                 }}
             >
 
@@ -95,8 +132,8 @@ export default function Dashboard() {
             style={{
                 background: "#0f172a",
                 minHeight: "100vh",
-                color: "#ffffff",
-                padding: 30,
+                color: "#fff",
+                padding: 25,
                 fontFamily: "Segoe UI",
             }}
         >
@@ -106,7 +143,7 @@ export default function Dashboard() {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    marginBottom: 30,
+                    marginBottom: 25,
                 }}
             >
 
@@ -120,11 +157,39 @@ export default function Dashboard() {
 
                 <div
                     style={{
-                        color: "#22c55e",
-                        fontWeight: "bold",
+                        display: "flex",
+                        gap: 15,
+                        alignItems: "center",
                     }}
                 >
-                    ● LIVE
+
+                    <strong>
+
+                        {structure?.trend}
+
+                    </strong>
+
+                    {
+
+                        structure?.bos &&
+                        <span>🟢 BOS</span>
+
+                    }
+
+                    {
+
+                        structure?.choch &&
+                        <span>🟠 CHoCH</span>
+
+                    }
+
+                    {
+
+                        structure?.mss &&
+                        <span>🔵 MSS</span>
+
+                    }
+
                 </div>
 
             </div>
@@ -132,7 +197,8 @@ export default function Dashboard() {
             <div
                 style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
+                    gridTemplateColumns:
+                        "1fr 1fr",
                     gap: 20,
                     marginBottom: 20,
                 }}
@@ -140,31 +206,47 @@ export default function Dashboard() {
 
                 <StatusCard
 
-                    connected={status?.connected ?? false}
+                    connected={
+                        status?.connected ?? false
+                    }
 
-                    account={status?.account}
+                    account={
+                        status?.account
+                    }
 
-                    company={status?.company}
+                    company={
+                        status?.company
+                    }
 
-                    server={status?.server}
+                    server={
+                        status?.server
+                    }
 
                 />
 
                 <TickCard
 
-                    symbol={tick?.symbol}
+                    symbol={
+                        tick?.symbol
+                    }
 
-                    bid={tick?.bid}
+                    bid={
+                        tick?.bid
+                    }
 
-                    ask={tick?.ask}
+                    ask={
+                        tick?.ask
+                    }
 
-                    spread={tick?.spread}
+                    spread={
+                        tick?.spread
+                    }
 
                 />
 
             </div>
 
-            <ChartCard
+            <TradingChart
 
                 candles={candles}
 
