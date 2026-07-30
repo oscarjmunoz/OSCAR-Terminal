@@ -8,6 +8,7 @@ from app.database import Base
 from app.database import engine
 
 import app.models
+import app.market.models
 
 
 logger.info("Starting OSCAR Terminal...")
