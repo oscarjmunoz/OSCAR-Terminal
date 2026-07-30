@@ -1,15 +1,19 @@
+# backend/app/main.py
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
+
 from app.config.settings import settings
 from app.core.logger import logger
 
-from app.database import Base
-from app.database import engine
+from app.database.base import Base
+from app.database.session import engine
 
 import app.models
 import app.market.models
+import app.smart_money
 
 logger.info("Starting OSCAR Terminal...")
 
@@ -37,18 +41,25 @@ app.include_router(api_router)
 
 @app.on_event("startup")
 async def startup_event():
+
     logger.info("Backend started successfully.")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
+
     logger.info("Backend stopped.")
 
 
 @app.get("/")
 async def root():
+
     return {
-        "project": settings.APP_NAME,
+
+        "application": settings.APP_NAME,
+
         "version": settings.APP_VERSION,
+
         "status": "running",
+
     }
