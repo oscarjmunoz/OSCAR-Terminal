@@ -6,6 +6,8 @@ from app.market.schemas import CandleResponse
 from app.market.schemas import TerminalStatus
 from app.market.schemas import TickResponse
 from app.market.timeframes import TIMEFRAMES
+from app.market.market_state import MarketState
+from app.market.schemas import MarketStateResponse
 
 
 class MarketService:

@@ -24,3 +24,12 @@ class CandleResponse(BaseModel):
     low: float
     close: float
     tick_volume: int
+
+
+class MarketStateResponse(BaseModel):
+    market_open: bool
+    session: str
+    spread: float
+    spread_status: str
+    tradable: bool
+    reason: str | None = None
