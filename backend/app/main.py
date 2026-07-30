@@ -4,13 +4,24 @@ from app.api.router import api_router
 from app.config.settings import settings
 from app.core.logger import logger
 
+from app.database import Base
+from app.database import engine
+
+import app.models
+
+
 logger.info("Starting OSCAR Terminal...")
+
+
+Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     debug=settings.DEBUG,
 )
+
 
 app.include_router(api_router)
 
