@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -13,4 +15,12 @@ class TickResponse(BaseModel):
     bid: float
     ask: float
     spread: float
-    
+
+
+class CandleResponse(BaseModel):
+    time: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    tick_volume: int
