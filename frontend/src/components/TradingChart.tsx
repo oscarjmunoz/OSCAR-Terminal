@@ -1,6 +1,3 @@
-// frontend/src/components/TradingChart.tsx
-// REEMPLAZAR COMPLETAMENTE EL ARCHIVO
-
 import { useEffect, useRef, useState } from "react";
 import {
     CandlestickSeries,

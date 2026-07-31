@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import TradingChart from "../components/TradingChart";
 import { LiveDataOrchestrator } from "../core/LiveDataOrchestrator";
@@ -6,7 +6,6 @@ import { MarketSnapshot, OrchestratedEngineOutput } from "../core/types";
 import { runBacktest } from "../engine/backtest/BacktestEngine";
 import { BacktestResult } from "../engine/backtest/types";
 import { getActiveStrategy } from "../engine/strategy/StrategyRegistry";
-import { StrategyDecision } from "../engine/strategy/types";
 import { runValidationEngine } from "../engine/validation/ValidationEngine";
 import { ValidationRecord } from "../engine/validation/types";
 import DecisionCenterLayout from "../layouts/DecisionCenterLayout";
@@ -56,18 +55,6 @@ export default function Dashboard() {
     const strategy = getActiveStrategy();
 
     const m5Analysis = output?.institutional.M5 ?? null;
-
-    const strategyDecision = useMemo<StrategyDecision>(() => {
-        if (!m5Analysis) {
-            return {
-                decision: "NO TRADE",
-                confidence: 0,
-                reasons: ["No analysis available"],
-            };
-        }
-
-        return strategy.evaluate(m5Analysis);
-    }, [m5Analysis, strategy]);
 
     useEffect(() => {
         const load = async () => {
@@ -120,7 +107,7 @@ export default function Dashboard() {
     const latestSignal = validationHistory[validationHistory.length - 1] ?? null;
     const context = m5Analysis.context;
     const score = m5Analysis.score;
-    const decision = m5Analysis.decision;
+    const decision = m5Analysis.decision ?? { type: "NO TRADE", confidence: 0, reason: [] };
 
     const liquidityBuckets = {
         BSL: m5Analysis.liquidity.filter((item) => item.type === "BSL").length,
@@ -164,11 +151,11 @@ export default function Dashboard() {
                     <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
                             <p className="text-xs text-slate-400">Decision</p>
-                            <p className="mt-1 text-lg font-semibold">{strategyDecision.decision}</p>
+                            <p className="mt-1 text-lg font-semibold">{decision.type}</p>
                         </div>
                         <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
                             <p className="text-xs text-slate-400">Confidence</p>
-                            <p className="mt-1 text-lg font-semibold">{strategyDecision.confidence}%</p>
+                            <p className="mt-1 text-lg font-semibold">{decision.confidence}%</p>
                         </div>
                         <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
                             <p className="text-xs text-slate-400">Liquidity</p>
@@ -248,7 +235,7 @@ export default function Dashboard() {
                         </div>
                         <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
                             <span className="text-slate-400">Confidence</span>
-                            <span className="font-semibold">{latestSignal?.confidence ?? strategyDecision.confidence}%</span>
+                            <span className="font-semibold">{latestSignal?.confidence ?? decision.confidence}%</span>
                         </div>
                         <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
                             <span className="text-slate-400">Score</span>
