@@ -1,8 +1,10 @@
 import { getCandles, getStatus, getTick } from "../api/market";
 import { getStructure } from "../api/smartMoney";
+import { JournalEngine } from "../engine/journal/JournalEngine";
 import { TimeframeName } from "../engine/mtf/types";
 import { runInstitutionalPipeline } from "../engine/pipeline/InstitutionalPipeline";
 import { InstitutionalAnalysis } from "../engine/pipeline/types";
+import { getActiveStrategy } from "../engine/strategy/StrategyRegistry";
 import {
   LiveDataSource,
   MarketSnapshot,
@@ -37,6 +39,7 @@ const defaultDataSource: LiveDataSource = {
 export class LiveDataOrchestrator {
   private readonly dataSource: LiveDataSource;
   private readonly config: OrchestratorConfig;
+  private readonly journalEngine = new JournalEngine();
   private readonly snapshots = new Map<string, MarketSnapshot>();
 
   constructor(dataSource: LiveDataSource = defaultDataSource, config: Partial<OrchestratorConfig> = {}) {
@@ -97,7 +100,13 @@ export class LiveDataOrchestrator {
     this.snapshots.clear();
   }
 
+  getJournalEngine(): JournalEngine {
+    return this.journalEngine;
+  }
+
   runEngines(snapshot: MarketSnapshot): OrchestratedEngineOutput {
+    const strategy = getActiveStrategy();
+
     const institutional = DEFAULT_TIMEFRAMES.reduce<Record<TimeframeName, InstitutionalAnalysis>>((acc, timeframe) => {
       const frame = snapshot.timeframes[timeframe];
 
@@ -110,6 +119,10 @@ export class LiveDataOrchestrator {
 
       return acc;
     }, {} as Record<TimeframeName, InstitutionalAnalysis>);
+
+    DEFAULT_TIMEFRAMES.forEach((timeframe) => {
+      this.journalEngine.registerSignal(snapshot, timeframe, institutional[timeframe], strategy.id);
+    });
 
     const h4Trend = institutional.H4.structure?.trend ?? "RANGE";
     const alignedCount = DEFAULT_TIMEFRAMES.reduce((count, timeframe) => {
@@ -172,6 +185,7 @@ export class LiveDataOrchestrator {
       snapshot,
       institutional,
       mtf,
+      journalEntries: this.journalEngine.getEntries(),
     };
   }
 }

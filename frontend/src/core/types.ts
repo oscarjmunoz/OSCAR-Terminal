@@ -1,5 +1,6 @@
 import { CandleResponse, TerminalStatus, TickResponse } from "../api/market";
 import { MarketStructure } from "../api/smartMoney";
+import { JournalEntry } from "../engine/journal/types";
 import { MultiTimeframeAnalysis, TimeframeName } from "../engine/mtf/types";
 import { InstitutionalAnalysis } from "../engine/pipeline/types";
 
@@ -39,4 +40,5 @@ export interface OrchestratedEngineOutput {
   snapshot: MarketSnapshot;
   institutional: Record<TimeframeName, InstitutionalAnalysis>;
   mtf: MultiTimeframeAnalysis;
+  journalEntries: JournalEntry[];
 }

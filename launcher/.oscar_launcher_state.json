@@ -1,0 +1,8 @@
+{
+  "project_root": "D:\\OSCAR-Terminal",
+  "backend_pid": 11764,
+  "frontend_pid": 4244,
+  "backend_url": "http://127.0.0.1:8000/health",
+  "frontend_url": "http://localhost:5173",
+  "started_at": 1785473665.8542225
+}
