@@ -1,7 +1,7 @@
 // frontend/src/components/TradingChart.tsx
 // REEMPLAZAR COMPLETAMENTE EL ARCHIVO
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     CandlestickSeries,
     ColorType,
@@ -13,6 +13,8 @@ import {
 } from "lightweight-charts";
 
 import { CandleResponse } from "../api/market";
+import { Swing, getSwings } from "../api/smartMoney";
+import LiquidityOverlay from "./LiquidityOverlay";
 import SmartMoneyOverlay from "./SmartMoneyOverlay";
 
 type Props = {
@@ -29,6 +31,8 @@ export default function TradingChart({
 
     const candleSeriesRef =
         useRef<ISeriesApi<"Candlestick"> | null>(null);
+
+    const [swings, setSwings] = useState<Swing[]>([]);
 
     useEffect(() => {
 
@@ -153,6 +157,19 @@ export default function TradingChart({
 
     }, [candles]);
 
+    useEffect(() => {
+        async function loadSwings() {
+            try {
+                const data = await getSwings();
+                setSwings(data);
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        loadSwings();
+    }, []);
+
     return (
 
         <>
@@ -163,6 +180,13 @@ export default function TradingChart({
 
             <SmartMoneyOverlay
                 candleSeries={candleSeriesRef.current}
+            />
+
+            <LiquidityOverlay
+                candleSeries={candleSeriesRef.current}
+                candles={candles}
+                swings={swings}
+                currentPrice={candles[candles.length - 1]?.close}
             />
 
         </>
