@@ -57,7 +57,16 @@ export default function Dashboard() {
     }
 
     return (
-        <DecisionCenterLayout>
+        <DecisionCenterLayout
+            trend={structure?.trend}
+            bos={structure?.bos}
+            choch={structure?.choch}
+            mss={structure?.mss}
+            connected={status?.connected ?? false}
+            spread={tick?.spread}
+            symbol={tick?.symbol}
+            timeframe="M5"
+        >
             <div className="flex h-full flex-col gap-4">
                 <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">
                     <div>
