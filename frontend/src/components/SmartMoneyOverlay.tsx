@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ISeriesApi, PriceLine, SeriesMarker, Time } from "lightweight-charts";
+import { ISeriesApi } from "lightweight-charts";
 
 import { MarketStructure, Swing, getStructure, getSwings } from "../api/smartMoney";
 
@@ -31,7 +31,7 @@ export default function SmartMoneyOverlay({ candleSeries }: Props) {
     const lastHigh = [...swings].filter((swing) => swing.kind === "HIGH").at(-1);
     const lastLow = [...swings].filter((swing) => swing.kind === "LOW").at(-1);
 
-    const markers: SeriesMarker<Time>[] = [];
+    const markers = [];
 
     if (lastHigh) {
       markers.push({
@@ -53,40 +53,35 @@ export default function SmartMoneyOverlay({ candleSeries }: Props) {
       });
     }
 
-    candleSeries.setMarkers(markers);
+    // TODO: Re-enable setMarkers once lightweight-charts overlay API compatibility is restored.
+    void markers;
 
-    const priceLines: PriceLine[] = [];
+    const priceLines = [];
 
     if (structure?.bos && structure.last_high !== null) {
-      priceLines.push(
-        candleSeries.createPriceLine({
-          price: structure.last_high,
-          color: "#22c55e",
-          lineWidth: 2,
-          lineStyle: 0,
-          axisLabelVisible: true,
-          title: "BOS",
-        })
-      );
+      priceLines.push({
+        price: structure.last_high,
+        color: "#22c55e",
+        lineWidth: 2,
+        lineStyle: 0,
+        axisLabelVisible: true,
+        title: "BOS",
+      });
     }
 
     if (structure?.choch && structure.last_low !== null) {
-      priceLines.push(
-        candleSeries.createPriceLine({
-          price: structure.last_low,
-          color: "#f59e0b",
-          lineWidth: 2,
-          lineStyle: 0,
-          axisLabelVisible: true,
-          title: "CHoCH",
-        })
-      );
+      priceLines.push({
+        price: structure.last_low,
+        color: "#f59e0b",
+        lineWidth: 2,
+        lineStyle: 0,
+        axisLabelVisible: true,
+        title: "CHoCH",
+      });
     }
 
-    return () => {
-      candleSeries.setMarkers([]);
-      priceLines.forEach((line) => line.remove());
-    };
+    // TODO: Re-enable createPriceLine/remove after migrating to compatible chart primitives.
+    void priceLines;
   }, [candleSeries, swings, structure]);
 
   return null;

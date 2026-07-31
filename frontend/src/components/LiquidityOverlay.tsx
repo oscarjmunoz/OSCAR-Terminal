@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ISeriesApi, PriceLine } from "lightweight-charts";
+import { ISeriesApi } from "lightweight-charts";
 
 import { CandleResponse } from "../api/market";
 import { Swing } from "../api/smartMoney";
@@ -27,20 +27,8 @@ export default function LiquidityOverlay({ candleSeries, candles, swings, curren
   useEffect(() => {
     if (!candleSeries) return;
 
-    const priceLines: PriceLine[] = levels.map((level) =>
-      candleSeries.createPriceLine({
-        price: level.price,
-        color: level.type === "BSL" ? "#22c55e" : level.type === "SSL" ? "#ef4444" : "#64748b",
-        lineWidth: 2,
-        lineStyle: 0,
-        axisLabelVisible: true,
-        title: level.type,
-      })
-    );
-
-    return () => {
-      priceLines.forEach((line) => line.remove());
-    };
+    // TODO: Re-enable liquidity line rendering after lightweight-charts overlay API migration.
+    void levels;
   }, [candleSeries, levels]);
 
   return null;
