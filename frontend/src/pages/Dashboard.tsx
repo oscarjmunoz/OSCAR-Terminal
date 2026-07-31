@@ -14,6 +14,8 @@ import StatusCard from "../components/StatusCard";
 import TickCard from "../components/TickCard";
 import TradingChart from "../components/TradingChart";
 import { calculateOscarScore } from "../engine/oscarScore";
+import { createMarketContext } from "../engine/context/MarketContextEngine";
+import { createLiquidityLevels } from "../engine/liquidity/LiquidityEngine";
 
 export default function Dashboard() {
     const [status, setStatus] = useState<TerminalStatus | null>(null);
@@ -21,6 +23,13 @@ export default function Dashboard() {
     const [candles, setCandles] = useState<CandleResponse[]>([]);
     const [structure, setStructure] = useState<MarketStructure | null>(null);
     const [loading, setLoading] = useState(true);
+    const liquidityLevels = createLiquidityLevels(candles, [], { currentPrice: tick?.ask ?? tick?.bid });
+    const marketContext = createMarketContext({
+        structure,
+        liquidityLevels,
+        tick,
+        status,
+    });
     const oscarScore = calculateOscarScore(structure, tick, status);
 
     useEffect(() => {
