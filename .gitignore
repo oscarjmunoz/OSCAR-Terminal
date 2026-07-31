@@ -1,0 +1,37 @@
+# ==========================================
+# OSCAR Terminal
+# ==========================================
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Backend
+backend/.venv/
+backend/__pycache__/
+backend/.pytest_cache/
+backend/*.pyc
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
