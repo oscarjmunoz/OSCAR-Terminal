@@ -57,3 +57,6 @@ Context alignment validation:
 
 - This engine is validation-only.
 - It does not generate orders, RR, or risk execution plans.
+- Rule metadata is resolved through the centralized `RuleRegistry`.
+- Rule execution is stored as `RuleResult` objects inside an `EngineResult`-derived IEZ result.
+- Engine execution can be emitted as `DecisionNode` and appended into `DecisionTree` for pipeline reasoning.

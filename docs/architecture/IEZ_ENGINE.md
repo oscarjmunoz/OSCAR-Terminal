@@ -4,6 +4,8 @@
 
 The Institutional Entry Zone (IEZ) Engine validates whether current price is positioned inside a qualified institutional entry zone with confluence and context alignment.
 
+This engine is now integrated into the institutional decision framework.
+
 ## Scope
 
 Implemented rules:
@@ -32,9 +34,11 @@ Implemented rules:
 - `mssAligned`: `bool`
 - `timeframeAligned`: `bool`
 
+`IEZEngine.run` accepts the same input plus an optional `DecisionTree` instance.
+
 ## Output Contract
 
-The output contract is `InstitutionalEntryZone` and includes:
+`InstitutionalEntryZone` inherits from `EngineResult` and includes:
 
 - `valid`
 - `direction`
@@ -57,6 +61,15 @@ The output contract is `InstitutionalEntryZone` and includes:
 - `reasons`
 - `warnings`
 
+Framework fields inherited from `EngineResult`:
+
+- `engine`
+- `status`
+- `score`
+- `passedRules` (`RuleResult[]`)
+- `failedRules` (`RuleResult[]`)
+- `executionTime`
+
 ## Scoring
 
 - `IEZ Score`: percentage based on number of passed rules
@@ -66,6 +79,17 @@ The output contract is `InstitutionalEntryZone` and includes:
   - `LOW`: valid below 75 or invalid with score >= 70
   - `NONE`: invalid with score < 70
 - `Quality Score`: IEZ score plus confluence/alignment bonus, capped at 100
+
+## Rule Registry Integration
+
+IEZ validation uses centralized rules from `RuleRegistry`.
+Each IEZ rule id (`IEZ-001`..`IEZ-007`) is resolved into metadata before building `RuleResult` entries.
+
+## Decision Node and Decision Tree Integration
+
+- `IEZEngine.evaluate` returns `InstitutionalEntryZone` (`EngineResult`-based object).
+- `IEZEngine.run` returns a `DecisionNode`.
+- If a `DecisionTree` is provided to `run`, the node is appended to the tree and `nextStep` is set to `EntryEngine`.
 
 ## Shared Model
 

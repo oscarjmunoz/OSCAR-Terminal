@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import time
 from typing import Literal
 from typing import TypedDict
 
+from app.core.DecisionNode import DecisionNode
+from app.core.DecisionStatus import DecisionStatus
+from app.core.DecisionTree import DecisionTree
+from app.core.RuleResult import RuleResult
+from app.core.Score import Score
 from app.engines.iez.InstitutionalEntryZone import InstitutionalEntryZone
+from app.rules.RuleRegistry import get_rule
 
 
 class IEZInput(TypedDict):
@@ -24,46 +31,40 @@ class IEZEngine:
 
     @staticmethod
     def evaluate(data: IEZInput) -> InstitutionalEntryZone:
-        passed_rules: list[str] = []
-        failed_rules: list[str] = []
-        reasons: list[str] = []
-        warnings: list[str] = []
+        start = time.perf_counter()
+        result = InstitutionalEntryZone.bootstrap(direction=data["direction"])
+
+        failed_critical = False
 
         iez_001 = data["direction"] != "NONE"
-        IEZEngine._register_rule(
+        failed_critical = IEZEngine._register_rule(
+            result=result,
             rule_id="IEZ-001",
             condition=iez_001,
             pass_message="Directional context for entry zone is defined.",
             fail_message="Directional context for entry zone is undefined.",
-            passed_rules=passed_rules,
-            failed_rules=failed_rules,
-            reasons=reasons,
-            warnings=warnings,
+            failed_critical=failed_critical,
         )
 
         zone_defined = data["entryZoneLow"] is not None and data["entryZoneHigh"] is not None
         iez_002 = zone_defined
-        IEZEngine._register_rule(
+        failed_critical = IEZEngine._register_rule(
+            result=result,
             rule_id="IEZ-002",
             condition=iez_002,
             pass_message="Entry zone boundaries are defined.",
             fail_message="Entry zone boundaries are missing.",
-            passed_rules=passed_rules,
-            failed_rules=failed_rules,
-            reasons=reasons,
-            warnings=warnings,
+            failed_critical=failed_critical,
         )
 
         iez_003 = zone_defined and data["entryZoneHigh"] > data["entryZoneLow"]
-        IEZEngine._register_rule(
+        failed_critical = IEZEngine._register_rule(
+            result=result,
             rule_id="IEZ-003",
             condition=iez_003,
             pass_message="Entry zone range is structurally valid.",
             fail_message="Entry zone range is invalid.",
-            passed_rules=passed_rules,
-            failed_rules=failed_rules,
-            reasons=reasons,
-            warnings=warnings,
+            failed_critical=failed_critical,
         )
 
         in_zone = IEZEngine._is_price_in_zone(
@@ -72,15 +73,13 @@ class IEZEngine:
             high=data["entryZoneHigh"],
         )
         iez_004 = in_zone
-        IEZEngine._register_rule(
+        failed_critical = IEZEngine._register_rule(
+            result=result,
             rule_id="IEZ-004",
             condition=iez_004,
             pass_message="Current price is inside institutional entry zone.",
             fail_message="Current price is outside institutional entry zone.",
-            passed_rules=passed_rules,
-            failed_rules=failed_rules,
-            reasons=reasons,
-            warnings=warnings,
+            failed_critical=failed_critical,
         )
 
         directional_location_aligned = IEZEngine._is_directional_location_aligned(
@@ -89,43 +88,39 @@ class IEZEngine:
             premium_for_short=data["premiumForShort"],
         )
         iez_005 = directional_location_aligned
-        IEZEngine._register_rule(
+        failed_critical = IEZEngine._register_rule(
+            result=result,
             rule_id="IEZ-005",
             condition=iez_005,
             pass_message="Directional location is aligned (discount for longs / premium for shorts).",
             fail_message="Directional location is not aligned.",
-            passed_rules=passed_rules,
-            failed_rules=failed_rules,
-            reasons=reasons,
-            warnings=warnings,
+            failed_critical=failed_critical,
         )
 
         iez_006 = data["fvgConfluence"] and data["obConfluence"]
-        IEZEngine._register_rule(
+        failed_critical = IEZEngine._register_rule(
+            result=result,
             rule_id="IEZ-006",
             condition=iez_006,
             pass_message="FVG and Order Block confluence are confirmed.",
             fail_message="FVG or Order Block confluence is missing.",
-            passed_rules=passed_rules,
-            failed_rules=failed_rules,
-            reasons=reasons,
-            warnings=warnings,
+            failed_critical=failed_critical,
         )
 
         iez_007 = data["liquidityContextAligned"] and data["mssAligned"] and data["timeframeAligned"]
-        IEZEngine._register_rule(
+        failed_critical = IEZEngine._register_rule(
+            result=result,
             rule_id="IEZ-007",
             condition=iez_007,
             pass_message="Liquidity, MSS, and timeframe alignment are confirmed.",
             fail_message="Liquidity, MSS, or timeframe alignment is missing.",
-            passed_rules=passed_rules,
-            failed_rules=failed_rules,
-            reasons=reasons,
-            warnings=warnings,
+            failed_critical=failed_critical,
         )
 
-        iez_score = IEZEngine._calculate_iez_score(passed_rules)
-        entry_priority = IEZEngine._resolve_entry_priority(iez_score=iez_score, valid=len(failed_rules) == 0)
+        passed_rule_ids = [rule_result.rule.id for rule_result in result.passedRules]
+        iez_score = IEZEngine._calculate_iez_score(passed_rule_ids)
+        is_valid = len(result.failedRules) == 0
+        entry_priority = IEZEngine._resolve_entry_priority(iez_score=iez_score, valid=is_valid)
         quality_score = IEZEngine._calculate_quality_score(
             iez_score=iez_score,
             fvg_confluence=data["fvgConfluence"],
@@ -133,47 +128,70 @@ class IEZEngine:
             directional_location_aligned=directional_location_aligned,
         )
 
-        return {
-            "valid": len(failed_rules) == 0,
-            "direction": data["direction"],
-            "entryZoneLow": data["entryZoneLow"],
-            "entryZoneHigh": data["entryZoneHigh"],
-            "currentPrice": data["currentPrice"],
-            "inZone": in_zone,
-            "discountForLong": data["discountForLong"],
-            "premiumForShort": data["premiumForShort"],
-            "fvgConfluence": data["fvgConfluence"],
-            "obConfluence": data["obConfluence"],
-            "liquidityContextAligned": data["liquidityContextAligned"],
-            "mssAligned": data["mssAligned"],
-            "timeframeAligned": data["timeframeAligned"],
-            "iezScore": iez_score,
-            "entryPriority": entry_priority,
-            "qualityScore": quality_score,
-            "passedRules": passed_rules,
-            "failedRules": failed_rules,
-            "reasons": reasons,
-            "warnings": warnings,
-        }
+        result.valid = is_valid
+        result.direction = data["direction"]
+        result.entryZoneLow = data["entryZoneLow"]
+        result.entryZoneHigh = data["entryZoneHigh"]
+        result.currentPrice = data["currentPrice"]
+        result.inZone = in_zone
+        result.discountForLong = data["discountForLong"]
+        result.premiumForShort = data["premiumForShort"]
+        result.fvgConfluence = data["fvgConfluence"]
+        result.obConfluence = data["obConfluence"]
+        result.liquidityContextAligned = data["liquidityContextAligned"]
+        result.mssAligned = data["mssAligned"]
+        result.timeframeAligned = data["timeframeAligned"]
+        result.iezScore = iez_score
+        result.entryPriority = entry_priority
+        result.qualityScore = quality_score
+        result.score = Score(iez_score)
+        result.status = IEZEngine._resolve_status(is_valid=is_valid, failed_critical=failed_critical)
+        result.executionTime = round((time.perf_counter() - start) * 1000, 4)
+
+        return result
+
+    @staticmethod
+    def run(data: IEZInput, tree: DecisionTree | None = None) -> DecisionNode:
+        result = IEZEngine.evaluate(data)
+        node = DecisionNode.from_engine_result(result)
+
+        if tree is not None:
+            tree.add_node(node)
+            tree.set_next_step("EntryEngine")
+
+        return node
 
     @staticmethod
     def _register_rule(
+        result: InstitutionalEntryZone,
         rule_id: str,
         condition: bool,
         pass_message: str,
         fail_message: str,
-        passed_rules: list[str],
-        failed_rules: list[str],
-        reasons: list[str],
-        warnings: list[str],
-    ) -> None:
-        if condition:
-            passed_rules.append(rule_id)
-            reasons.append(f"{rule_id}: {pass_message}")
-            return
+        failed_critical: bool,
+    ) -> bool:
+        rule = get_rule(rule_id)
 
-        failed_rules.append(rule_id)
-        warnings.append(f"{rule_id}: {fail_message}")
+        if condition:
+            result.add_rule_result(
+                RuleResult(
+                    rule=rule,
+                    status=DecisionStatus.PASS,
+                    score=rule.weight,
+                    reason=f"{rule_id}: {pass_message}",
+                )
+            )
+            return failed_critical
+
+        result.add_rule_result(
+            RuleResult(
+                rule=rule,
+                status=DecisionStatus.FAIL if rule.critical else DecisionStatus.WARNING,
+                score=0,
+                warning=f"{rule_id}: {fail_message}",
+            )
+        )
+        return failed_critical or rule.critical
 
     @staticmethod
     def _is_price_in_zone(current_price: float, low: float | None, high: float | None) -> bool:
@@ -199,6 +217,16 @@ class IEZEngine:
     @staticmethod
     def _calculate_iez_score(passed_rules: list[str]) -> int:
         return int(round((len(passed_rules) / 7) * 100))
+
+    @staticmethod
+    def _resolve_status(is_valid: bool, failed_critical: bool) -> DecisionStatus:
+        if is_valid:
+            return DecisionStatus.PASS
+
+        if failed_critical:
+            return DecisionStatus.FAIL
+
+        return DecisionStatus.WARNING
 
     @staticmethod
     def _resolve_entry_priority(

@@ -1,27 +1,38 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Literal
-from typing import TypedDict
+
+from app.core.DecisionStatus import DecisionStatus
+from app.core.EngineResult import EngineResult
+from app.core.Score import Score
 
 
-class InstitutionalEntryZone(TypedDict):
-    valid: bool
-    direction: Literal["BULLISH", "BEARISH", "NONE"]
-    entryZoneLow: float | None
-    entryZoneHigh: float | None
-    currentPrice: float
-    inZone: bool
-    discountForLong: bool
-    premiumForShort: bool
-    fvgConfluence: bool
-    obConfluence: bool
-    liquidityContextAligned: bool
-    mssAligned: bool
-    timeframeAligned: bool
-    iezScore: int
-    entryPriority: Literal["HIGH", "MEDIUM", "LOW", "NONE"]
-    qualityScore: int
-    passedRules: list[str]
-    failedRules: list[str]
-    reasons: list[str]
-    warnings: list[str]
+@dataclass(slots=True)
+class InstitutionalEntryZone(EngineResult):
+    valid: bool = False
+    direction: Literal["BULLISH", "BEARISH", "NONE"] = "NONE"
+    entryZoneLow: float | None = None
+    entryZoneHigh: float | None = None
+    currentPrice: float = 0.0
+    inZone: bool = False
+    discountForLong: bool = False
+    premiumForShort: bool = False
+    fvgConfluence: bool = False
+    obConfluence: bool = False
+    liquidityContextAligned: bool = False
+    mssAligned: bool = False
+    timeframeAligned: bool = False
+    iezScore: int = 0
+    entryPriority: Literal["HIGH", "MEDIUM", "LOW", "NONE"] = "NONE"
+    qualityScore: int = 0
+
+    @staticmethod
+    def bootstrap(direction: Literal["BULLISH", "BEARISH", "NONE"]) -> "InstitutionalEntryZone":
+        return InstitutionalEntryZone(
+            engine="IEZEngine",
+            status=DecisionStatus.WAIT,
+            score=Score(0),
+            direction=direction,
+            entryPriority="NONE",
+        )
