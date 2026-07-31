@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import SmartScanner, { SmartScannerDecision, SmartScannerRow } from "../components/SmartScanner";
 import TradingChart from "../components/TradingChart";
 import { LiveDataOrchestrator } from "../core/LiveDataOrchestrator";
 import { MarketSnapshot, OrchestratedEngineOutput } from "../core/types";
@@ -10,7 +11,23 @@ import { runValidationEngine } from "../engine/validation/ValidationEngine";
 import { ValidationRecord } from "../engine/validation/types";
 import DecisionCenterLayout from "../layouts/DecisionCenterLayout";
 
-const DEFAULT_SYMBOL = "USDCHF.pro";
+const DEFAULT_SYMBOL = "USDCHF";
+const SYMBOL_TO_MARKET: Record<string, string> = {
+    EURUSD: "EURUSD.pro",
+    GBPUSD: "GBPUSD.pro",
+    USDCHF: "USDCHF.pro",
+    XAUUSD: "XAUUSD",
+    NAS100: "NAS100",
+};
+
+const MOCK_SCANNER_ROWS: SmartScannerRow[] = [
+    { symbol: "EURUSD", decision: "WAIT", score: 52, confidence: 58, trend: "RANGE", source: "MOCK" },
+    { symbol: "GBPUSD", decision: "SELL", score: 68, confidence: 64, trend: "BEARISH", source: "MOCK" },
+    { symbol: "USDCHF", decision: "BUY", score: 74, confidence: 71, trend: "BULLISH", source: "MOCK" },
+    { symbol: "XAUUSD", decision: "WAIT", score: 49, confidence: 55, trend: "RANGE", source: "MOCK" },
+    { symbol: "NAS100", decision: "BUY", score: 62, confidence: 60, trend: "BULLISH", source: "MOCK" },
+];
+
 const EMPTY_BACKTEST: BacktestResult = {
     totalSignals: 0,
     wins: 0,
@@ -38,6 +55,18 @@ function formatTimestamp(value: number): string {
     return new Date(value).toLocaleTimeString();
 }
 
+function resolveMarketSymbol(scannerSymbol: string): string {
+    return SYMBOL_TO_MARKET[scannerSymbol] ?? scannerSymbol;
+}
+
+function normalizeScannerDecision(decision: string | undefined): SmartScannerDecision {
+    if (decision === "BUY" || decision === "SELL") {
+        return decision;
+    }
+
+    return "WAIT";
+}
+
 export default function Dashboard() {
     const orchestratorRef = useRef<LiveDataOrchestrator | null>(null);
     const validationHistoryRef = useRef<ValidationRecord[]>([]);
@@ -46,6 +75,8 @@ export default function Dashboard() {
     const [output, setOutput] = useState<OrchestratedEngineOutput | null>(null);
     const [validationHistory, setValidationHistory] = useState<ValidationRecord[]>([]);
     const [backtestResult, setBacktestResult] = useState<BacktestResult>(EMPTY_BACKTEST);
+    const [selectedScannerSymbol, setSelectedScannerSymbol] = useState(DEFAULT_SYMBOL);
+    const [scannerRows, setScannerRows] = useState<SmartScannerRow[]>(MOCK_SCANNER_ROWS);
     const [loading, setLoading] = useState(true);
 
     if (!orchestratorRef.current) {
@@ -62,10 +93,32 @@ export default function Dashboard() {
                 const orchestrator = orchestratorRef.current;
                 if (!orchestrator) return;
 
-                const newSnapshot = await orchestrator.refreshSnapshot(DEFAULT_SYMBOL);
+                const marketSymbol = resolveMarketSymbol(selectedScannerSymbol);
+                const newSnapshot = await orchestrator.refreshSnapshot(marketSymbol);
                 const engineOutput = orchestrator.runEngines(newSnapshot);
                 setSnapshot(newSnapshot);
                 setOutput(engineOutput);
+
+                setScannerRows((current) =>
+                    current.map((row) => {
+                        if (row.symbol !== selectedScannerSymbol) {
+                            return row;
+                        }
+
+                        const liveDecision = engineOutput.institutional.M5.decision;
+                        const liveContext = engineOutput.institutional.M5.context;
+                        const liveScore = engineOutput.institutional.M5.score;
+
+                        return {
+                            ...row,
+                            decision: normalizeScannerDecision(liveDecision?.type),
+                            confidence: liveDecision?.confidence ?? row.confidence,
+                            score: liveScore?.score ?? row.score,
+                            trend: liveContext?.trend ?? row.trend,
+                            source: "PIPELINE",
+                        };
+                    })
+                );
 
                 const latestValidation = runValidationEngine({
                     analysis: engineOutput.institutional.M5,
@@ -90,11 +143,12 @@ export default function Dashboard() {
             }
         };
 
+        setLoading(true);
         load();
         const timer = window.setInterval(load, 3000);
 
         return () => window.clearInterval(timer);
-    }, []);
+    }, [selectedScannerSymbol]);
 
     if (loading || !snapshot || !output || !m5Analysis) {
         return (
@@ -171,8 +225,12 @@ export default function Dashboard() {
                 </section>
 
                 <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 xl:col-span-4">
-                    <h2 className="mb-4 text-lg font-semibold">Estado del Sistema</h2>
-                    <div className="space-y-2 text-sm">
+                    <SmartScanner
+                        rows={scannerRows}
+                        selectedSymbol={selectedScannerSymbol}
+                        onSelect={setSelectedScannerSymbol}
+                    />
+                    <div className="mt-4 space-y-2 text-sm">
                         <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
                             <span className="text-slate-400">MT5</span>
                             <span className={snapshot.status?.connected ? "font-semibold text-emerald-400" : "font-semibold text-rose-400"}>
@@ -184,12 +242,8 @@ export default function Dashboard() {
                             <span className="font-semibold">{formatTimestamp(snapshot.timestamp)}</span>
                         </div>
                         <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
-                            <span className="text-slate-400">Simbolo</span>
-                            <span className="font-semibold">{snapshot.symbol}</span>
-                        </div>
-                        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
-                            <span className="text-slate-400">Timeframe</span>
-                            <span className="font-semibold">M5</span>
+                            <span className="text-slate-400">Simbolo Activo</span>
+                            <span className="font-semibold">{selectedScannerSymbol}</span>
                         </div>
                     </div>
                 </section>
