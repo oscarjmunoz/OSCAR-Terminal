@@ -1,0 +1,39 @@
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/.venv": true,
+        "**/*.pyc": true
+    },
+
+    "search.exclude": {
+        "**/.git": true,
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/.venv": true
+    },
+
+    "files.watcherExclude": {
+        "**/.git/**": true,
+        "**/node_modules/**": true,
+        "**/dist/**": true,
+        "**/__pycache__/**": true,
+        "**/.pytest_cache/**": true,
+        "**/.venv/**": true
+    },
+
+    "typescript.tsserver.maxTsServerMemory": 2048,
+
+    "typescript.disableAutomaticTypeAcquisition": true,
+
+    "editor.codeLens": false,
+
+    "git.autorefresh": true,
+
+    "git.autofetch": false
+}

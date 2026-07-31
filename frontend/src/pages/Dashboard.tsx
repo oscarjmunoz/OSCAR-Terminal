@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 
-import DecisionExplanationCard from "../components/DecisionExplanationCard";
 import TradingChart from "../components/TradingChart";
 import { LiveDataOrchestrator } from "../core/LiveDataOrchestrator";
 import { ExplainableDecisionOutput, MarketSnapshot, OrchestratedEngineOutput } from "../core/types";
@@ -12,9 +11,6 @@ import { ValidationRecord } from "../engine/validation/types";
 import DecisionCenterLayout from "../layouts/DecisionCenterLayout";
 
 const DEFAULT_SYMBOL = "USDCHF.pro";
-const WATCHLIST_SYMBOLS = ["USDCHF", "EURUSD", "GBPUSD", "XAUUSD", "NAS100"];
-const FOOTER_TABS = ["Journal", "Alerts", "Analytics", "Backtest", "Logs"];
-
 const EMPTY_BACKTEST: BacktestResult = {
     totalSignals: 0,
     wins: 0,
@@ -42,56 +38,6 @@ function formatTimestamp(value: number): string {
     return new Date(value).toLocaleTimeString();
 }
 
-function normalizeDecision(type: string | undefined): "BUY" | "SELL" | "WAIT" {
-    if (type === "BUY" || type === "SELL") {
-        return type;
-    }
-
-    return "WAIT";
-}
-
-function resolveRiskLevel(decision: "BUY" | "SELL" | "WAIT", confidence: number, score: number): "Low" | "Medium" | "High" {
-    if (decision === "WAIT") {
-        return "High";
-    }
-
-    if (confidence >= 75 && score >= 75) {
-        return "Low";
-    }
-
-    if (confidence >= 55 && score >= 55) {
-        return "Medium";
-    }
-
-    return "High";
-}
-
-function buildFallbackReasons(params: {
-    trend: string;
-    bias: string;
-    score: number;
-    liquidityCount: number;
-    hasBos: boolean;
-    hasChoch: boolean;
-}): string[] {
-    const reasons = [
-        `Trend: ${params.trend}`,
-        `Bias: ${params.bias}`,
-        `Score: ${params.score}`,
-        `Liquidity levels: ${params.liquidityCount}`,
-    ];
-
-    if (params.hasBos) {
-        reasons.push("BOS confirmed on current structure");
-    }
-
-    if (params.hasChoch) {
-        reasons.push("CHoCH detected on current structure");
-    }
-
-    return reasons;
-}
-
 export default function Dashboard() {
     const orchestratorRef = useRef<LiveDataOrchestrator | null>(null);
     const validationHistoryRef = useRef<ValidationRecord[]>([]);
@@ -100,6 +46,8 @@ export default function Dashboard() {
     const [output, setOutput] = useState<OrchestratedEngineOutput | null>(null);
     const [validationHistory, setValidationHistory] = useState<ValidationRecord[]>([]);
     const [backtestResult, setBacktestResult] = useState<BacktestResult>(EMPTY_BACKTEST);
+    const [selectedScannerSymbol, setSelectedScannerSymbol] = useState(DEFAULT_SYMBOL);
+    const [scannerRows, setScannerRows] = useState<SmartScannerRow[]>(MOCK_SCANNER_ROWS);
     const [loading, setLoading] = useState(true);
 
     if (!orchestratorRef.current) {
@@ -116,10 +64,32 @@ export default function Dashboard() {
                 const orchestrator = orchestratorRef.current;
                 if (!orchestrator) return;
 
-                const newSnapshot = await orchestrator.refreshSnapshot(DEFAULT_SYMBOL);
+                const marketSymbol = resolveMarketSymbol(selectedScannerSymbol);
+                const newSnapshot = await orchestrator.refreshSnapshot(marketSymbol);
                 const engineOutput = orchestrator.runEngines(newSnapshot);
                 setSnapshot(newSnapshot);
                 setOutput(engineOutput);
+
+                setScannerRows((current) =>
+                    current.map((row) => {
+                        if (row.symbol !== selectedScannerSymbol) {
+                            return row;
+                        }
+
+                        const liveDecision = engineOutput.institutional.M5.decision;
+                        const liveContext = engineOutput.institutional.M5.context;
+                        const liveScore = engineOutput.institutional.M5.score;
+
+                        return {
+                            ...row,
+                            decision: normalizeScannerDecision(liveDecision?.type),
+                            confidence: liveDecision?.confidence ?? row.confidence,
+                            score: liveScore?.score ?? row.score,
+                            trend: liveContext?.trend ?? row.trend,
+                            source: "PIPELINE",
+                        };
+                    })
+                );
 
                 const latestValidation = runValidationEngine({
                     analysis: engineOutput.institutional.M5,
@@ -144,11 +114,12 @@ export default function Dashboard() {
             }
         };
 
+        setLoading(true);
         load();
         const timer = window.setInterval(load, 3000);
 
         return () => window.clearInterval(timer);
-    }, []);
+    }, [selectedScannerSymbol]);
 
     if (loading || !snapshot || !output || !m5Analysis) {
         return (
@@ -270,19 +241,43 @@ export default function Dashboard() {
                             <p className="text-xs text-slate-400">BOS</p>
                             <p className="mt-1 text-sm font-semibold">{m5Analysis.structure?.bos ? "YES" : "NO"}</p>
                         </div>
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                            <p className="text-xs text-slate-400">CHoCH</p>
-                            <p className="mt-1 text-sm font-semibold">{m5Analysis.structure?.choch ? "YES" : "NO"}</p>
+                    </div>
+                </section>
+
+                <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 xl:col-span-4">
+                    <h2 className="mb-4 text-lg font-semibold">Estado del Sistema</h2>
+                    <div className="space-y-2 text-sm">
+                        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
+                            <span className="text-slate-400">MT5</span>
+                            <span className={snapshot.status?.connected ? "font-semibold text-emerald-400" : "font-semibold text-rose-400"}>
+                                {snapshot.status?.connected ? "Conectado" : "Offline"}
+                            </span>
                         </div>
                         <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
                             <p className="text-xs text-slate-400">FVG</p>
                             <p className="mt-1 text-sm font-semibold">{fvgSummary}</p>
                         </div>
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                            <p className="text-xs text-slate-400">Order Block</p>
-                            <p className="mt-1 text-sm font-semibold">{orderBlockSummary}</p>
+                        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
+                            <span className="text-slate-400">Simbolo</span>
+                            <span className="font-semibold">{snapshot.symbol}</span>
                         </div>
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 sm:col-span-2 lg:col-span-3">
+                        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
+                            <span className="text-slate-400">Timeframe</span>
+                            <span className="font-semibold">M5</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 xl:col-span-7">
+                    <h2 className="mb-4 text-lg font-semibold">Panel de Analisis</h2>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm">
+                            <p className="text-xs text-slate-400">Trend / Bias / Phase</p>
+                            <p className="mt-1 font-semibold">{context?.trend ?? "RANGE"}</p>
+                            <p className="font-semibold">{context?.bias ?? "NEUTRAL"}</p>
+                            <p className="font-semibold">{context?.phase ?? "ACCUMULATION"}</p>
+                        </div>
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm">
                             <p className="text-xs text-slate-400">Premium / Discount</p>
                             <p className="mt-1 text-sm font-semibold">{premiumDiscountValue}</p>
                         </div>

@@ -23,6 +23,7 @@ __pycache__/
 node_modules/
 dist/
 .vite/
+<<<<<<< HEAD
 
 # ---------- Logs ----------
 *.log
@@ -36,3 +37,7 @@ logs/
 .DS_Store
 Thumbs.db
 desktop.ini
+=======
+.vscode/*
+!.vscode/settings.json
+>>>>>>> feature/smart-scanner
