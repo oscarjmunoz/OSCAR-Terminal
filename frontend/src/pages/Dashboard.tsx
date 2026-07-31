@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
+import DecisionExplanationCard from "../components/DecisionExplanationCard";
 import TradingChart from "../components/TradingChart";
 import { LiveDataOrchestrator } from "../core/LiveDataOrchestrator";
-import { MarketSnapshot, OrchestratedEngineOutput } from "../core/types";
+import { ExplainableDecisionOutput, MarketSnapshot, OrchestratedEngineOutput } from "../core/types";
 import { runBacktest } from "../engine/backtest/BacktestEngine";
 import { BacktestResult } from "../engine/backtest/types";
 import { getActiveStrategy } from "../engine/strategy/StrategyRegistry";
@@ -49,40 +50,20 @@ function normalizeDecision(type: string | undefined): "BUY" | "SELL" | "WAIT" {
     return "WAIT";
 }
 
-function getDecisionClasses(decision: "BUY" | "SELL" | "WAIT"): { badge: string; text: string } {
-    if (decision === "BUY") {
-        return {
-            badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
-            text: "text-emerald-300",
-        };
+function resolveRiskLevel(decision: "BUY" | "SELL" | "WAIT", confidence: number, score: number): "Low" | "Medium" | "High" {
+    if (decision === "WAIT") {
+        return "High";
     }
 
-    if (decision === "SELL") {
-        return {
-            badge: "bg-rose-500/15 text-rose-300 border-rose-500/40",
-            text: "text-rose-300",
-        };
+    if (confidence >= 75 && score >= 75) {
+        return "Low";
     }
 
-    return {
-        badge: "bg-amber-500/15 text-amber-300 border-amber-500/40",
-        text: "text-amber-300",
-    };
-}
+    if (confidence >= 55 && score >= 55) {
+        return "Medium";
+    }
 
-function getScoreWidthClass(score: number): string {
-    if (score >= 95) return "w-full";
-    if (score >= 90) return "w-11/12";
-    if (score >= 80) return "w-10/12";
-    if (score >= 70) return "w-9/12";
-    if (score >= 60) return "w-8/12";
-    if (score >= 50) return "w-7/12";
-    if (score >= 40) return "w-6/12";
-    if (score >= 30) return "w-5/12";
-    if (score >= 20) return "w-4/12";
-    if (score >= 10) return "w-3/12";
-
-    return "w-2/12";
+    return "High";
 }
 
 function buildFallbackReasons(params: {
@@ -182,9 +163,7 @@ export default function Dashboard() {
     const score = m5Analysis.score;
     const decision = m5Analysis.decision ?? { type: "NO TRADE", confidence: 0, reason: [] };
     const decisionType = normalizeDecision(decision.type);
-    const decisionTone = getDecisionClasses(decisionType);
     const scoreValue = score?.score ?? 0;
-    const scoreWidthClass = getScoreWidthClass(scoreValue);
 
     const liquidityBuckets = {
         BSL: m5Analysis.liquidity.filter((item) => item.type === "BSL").length,
@@ -208,44 +187,35 @@ export default function Dashboard() {
     const fvgSummary = m5Analysis.fairValueGaps.map((item) => `${item.type} (${item.status})`).slice(0, 2).join(" | ") || "None";
     const orderBlockSummary = m5Analysis.orderBlocks.map((item) => `${item.type} (${item.status})`).slice(0, 2).join(" | ") || "None";
 
+    const invalidation = (() => {
+        if (decisionType === "BUY" && m5Analysis.structure?.last_low !== null && m5Analysis.structure?.last_low !== undefined) {
+            return `Invalid if price closes below ${m5Analysis.structure.last_low.toFixed(5)} (last low).`;
+        }
+
+        if (decisionType === "SELL" && m5Analysis.structure?.last_high !== null && m5Analysis.structure?.last_high !== undefined) {
+            return `Invalid if price closes above ${m5Analysis.structure.last_high.toFixed(5)} (last high).`;
+        }
+
+        return "Placeholder: explicit invalidation level not available in current state.";
+    })();
+
+    const explainableDecision: ExplainableDecisionOutput = {
+        decision: decisionType,
+        confidence: decision.confidence,
+        score: scoreValue,
+        reasons: whyReasons,
+        risk: resolveRiskLevel(decisionType, decision.confidence, scoreValue),
+        invalidation,
+        expectedRR: "2.0R (placeholder: fixed from current backtest model)",
+        strategy: `${strategy.name} (${strategy.id.toUpperCase()})`,
+    };
+
     return (
         <DecisionCenterLayout>
             <div className="grid gap-4 xl:grid-cols-12">
-                <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 xl:col-span-8">
-                    <div className="mb-6 flex items-center justify-between">
-                        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Decision Center</p>
-                        <span className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-xs font-semibold text-slate-300">
-                            {snapshot.symbol}
-                        </span>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-6">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Decision</p>
-                        <p className={`mt-3 text-6xl font-black tracking-tight sm:text-7xl ${decisionTone.text}`}>{decisionType}</p>
-
-                        <div className="mt-4 flex items-center gap-3">
-                            <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${decisionTone.badge}`}>
-                                {decisionType} Signal
-                            </span>
-                            <span className="text-xs text-slate-400">Strategy: {strategy.name}</span>
-                        </div>
-
-                        <div className="mt-6">
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Confidence</p>
-                            <p className="mt-2 text-3xl font-bold text-white">{decision.confidence}%</p>
-                        </div>
-
-                        <div className="mt-6">
-                            <div className="mb-2 flex items-center justify-between">
-                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Oscar Score</p>
-                                <p className="text-sm font-semibold text-slate-200">{scoreValue}/100</p>
-                            </div>
-                            <div className="h-3 w-full overflow-hidden rounded-full bg-slate-800">
-                                <div className={`h-3 rounded-full bg-gradient-to-r from-sky-500 via-emerald-400 to-emerald-300 ${scoreWidthClass}`} />
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                <div className="xl:col-span-8">
+                    <DecisionExplanationCard data={explainableDecision} />
+                </div>
 
                 <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 xl:col-span-4">
                     <h2 className="mb-4 text-lg font-semibold">Watchlist</h2>
@@ -282,17 +252,6 @@ export default function Dashboard() {
                             <span>{formatTimestamp(snapshot.timestamp)}</span>
                         </div>
                     </div>
-                </section>
-
-                <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 xl:col-span-5">
-                    <h2 className="mb-4 text-lg font-semibold">WHY?</h2>
-                    <ul className="space-y-2">
-                        {whyReasons.slice(0, 6).map((item) => (
-                            <li key={item} className="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-200">
-                                {item}
-                            </li>
-                        ))}
-                    </ul>
                 </section>
 
                 <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 xl:col-span-7">
