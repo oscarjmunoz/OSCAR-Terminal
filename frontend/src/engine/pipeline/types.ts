@@ -4,24 +4,35 @@ import { LiquidityLevel } from "../liquidity/types";
 import { MarketContext } from "../context/types";
 import { OscarScore } from "../oscarScore";
 
+export type OrderBlockType = "BULLISH_OB" | "BEARISH_OB" | "MITIGATED" | "UNMITIGATED";
+export type FairValueGapType = "BULLISH_FVG" | "BEARISH_FVG" | "FILLED" | "OPEN";
+export type PremiumDiscountType = "PREMIUM" | "EQUILIBRIUM" | "DISCOUNT";
+export type DecisionType = "BUY" | "SELL" | "WAIT" | "NO TRADE";
+
 export interface OrderBlockState {
-  type: "PLACEHOLDER";
-  value: string;
+  type: OrderBlockType;
+  price: number;
+  index: number;
+  status: "MITIGATED" | "UNMITIGATED";
 }
 
 export interface FairValueGapState {
-  type: "PLACEHOLDER";
-  value: string;
+  type: FairValueGapType;
+  price: number;
+  index: number;
+  status: "FILLED" | "OPEN";
 }
 
 export interface PremiumDiscountState {
-  type: "PLACEHOLDER";
-  value: string;
+  type: PremiumDiscountType;
+  price: number;
+  index: number;
 }
 
 export interface DecisionState {
-  type: "PLACEHOLDER";
-  value: string;
+  type: DecisionType;
+  confidence: number;
+  reason: string[];
 }
 
 export interface InstitutionalAnalysis {

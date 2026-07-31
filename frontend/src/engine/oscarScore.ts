@@ -1,5 +1,7 @@
 import { TerminalStatus, TickResponse } from "../api/market";
 import { MarketStructure } from "../api/smartMoney";
+import { LiquidityLevel } from "./liquidity/types";
+import { MarketContext } from "./context/types";
 
 export interface OscarScore {
   score: number;
@@ -11,7 +13,12 @@ export interface OscarScore {
 export function calculateOscarScore(
   structure: MarketStructure | null,
   tick: TickResponse | null,
-  status: TerminalStatus | null
+  status: TerminalStatus | null,
+  context?: MarketContext | null,
+  liquidity?: LiquidityLevel[],
+  orderBlocks?: Array<{ type: string; status: string }> | null,
+  fairValueGaps?: Array<{ type: string; status: string }> | null,
+  premiumDiscount?: Array<{ type: string }> | null
 ): OscarScore {
   let score = 0;
   const reason: string[] = [];
@@ -26,17 +33,17 @@ export function calculateOscarScore(
   }
 
   if (structure.trend === "BULLISH") {
-    score += 25;
+    score += 20;
     reason.push("Bullish trend");
   } else if (structure.trend === "BEARISH") {
-    score += 25;
+    score += 20;
     reason.push("Bearish trend");
   } else {
     reason.push("Range or unknown trend");
   }
 
   if (structure.bos) {
-    score += 20;
+    score += 15;
     reason.push("BOS confirmed");
   }
 
@@ -46,13 +53,33 @@ export function calculateOscarScore(
   }
 
   if (structure.mss) {
-    score += 15;
+    score += 10;
     reason.push("MSS confirmed");
   }
 
-  if (status?.connected) {
+  if (context?.connected) {
     score += 10;
     reason.push("MT5 connected");
+  }
+
+  if (liquidity && liquidity.length) {
+    score += 10;
+    reason.push("Liquidity identified");
+  }
+
+  if (orderBlocks && orderBlocks.length) {
+    score += 10;
+    reason.push("Order blocks identified");
+  }
+
+  if (fairValueGaps && fairValueGaps.length) {
+    score += 10;
+    reason.push("FVGs detected");
+  }
+
+  if (premiumDiscount && premiumDiscount.length) {
+    score += 5;
+    reason.push("Premium/discount context available");
   }
 
   if (tick?.spread !== undefined) {
