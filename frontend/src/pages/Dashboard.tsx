@@ -13,6 +13,7 @@ import { MarketStructure, getStructure } from "../api/smartMoney";
 import StatusCard from "../components/StatusCard";
 import TickCard from "../components/TickCard";
 import TradingChart from "../components/TradingChart";
+import { calculateOscarScore } from "../engine/oscarScore";
 
 export default function Dashboard() {
     const [status, setStatus] = useState<TerminalStatus | null>(null);
@@ -20,6 +21,7 @@ export default function Dashboard() {
     const [candles, setCandles] = useState<CandleResponse[]>([]);
     const [structure, setStructure] = useState<MarketStructure | null>(null);
     const [loading, setLoading] = useState(true);
+    const oscarScore = calculateOscarScore(structure, tick, status);
 
     useEffect(() => {
         const load = async () => {
@@ -95,6 +97,35 @@ export default function Dashboard() {
                         ask={tick?.ask}
                         spread={tick?.spread}
                     />
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-2xl shadow-black/20">
+                    <div className="mb-4 flex items-center justify-between">
+                        <h2 className="text-lg font-semibold text-white">OSCAR SCORE</h2>
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${oscarScore.score >= 80 ? "bg-emerald-500/15 text-emerald-400" : oscarScore.score >= 60 ? "bg-amber-500/15 text-amber-400" : "bg-rose-500/15 text-rose-400"}`}>
+                            {oscarScore.decision}
+                        </span>
+                    </div>
+                    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                        <div>
+                            <p className="text-5xl font-black text-white">{oscarScore.score}</p>
+                            <p className="mt-2 text-sm text-slate-400">0-100</p>
+                        </div>
+                        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                            <p className="text-sm text-slate-400">Confidence</p>
+                            <p className="mt-1 text-2xl font-semibold text-white">{oscarScore.confidence}%</p>
+                        </div>
+                    </div>
+                    <div className="mt-4">
+                        <p className="text-sm font-semibold text-slate-300">Reason</p>
+                        <ul className="mt-2 space-y-2 text-sm text-slate-400">
+                            {oscarScore.reason.map((item) => (
+                                <li key={item} className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2">
+                                    {item}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                 </div>
 
                 <div className="min-h-[320px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60">
