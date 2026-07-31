@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import DecisionExplanationCard, { MockDecisionPlan } from "../components/DecisionExplanationCard";
 import TradingChart from "../components/TradingChart";
 import { LiveDataOrchestrator } from "../core/LiveDataOrchestrator";
 import { ExplainableDecisionOutput, MarketSnapshot, OrchestratedEngineOutput } from "../core/types";
@@ -11,6 +12,37 @@ import { ValidationRecord } from "../engine/validation/types";
 import DecisionCenterLayout from "../layouts/DecisionCenterLayout";
 
 const DEFAULT_SYMBOL = "USDCHF.pro";
+const WATCHLIST_SYMBOLS = ["USDCHF", "EURUSD", "GBPUSD", "XAUUSD"];
+const FOOTER_TABS = ["Institutional", "Execution", "Risk", "Journal"];
+
+type SmartScannerRow = {
+    symbol: string;
+    decision: "BUY" | "SELL" | "WAIT";
+    confidence: number;
+    score: number;
+    trend: string;
+    source: "MOCK" | "PIPELINE";
+};
+
+const MOCK_SCANNER_ROWS: SmartScannerRow[] = [
+    { symbol: "USDCHF.pro", decision: "WAIT", confidence: 0, score: 0, trend: "RANGE", source: "MOCK" },
+    { symbol: "EURUSD.pro", decision: "WAIT", confidence: 0, score: 0, trend: "RANGE", source: "MOCK" },
+    { symbol: "GBPUSD.pro", decision: "WAIT", confidence: 0, score: 0, trend: "RANGE", source: "MOCK" },
+    { symbol: "XAUUSD.pro", decision: "WAIT", confidence: 0, score: 0, trend: "RANGE", source: "MOCK" },
+];
+
+const MOCK_DECISION_PLAN: MockDecisionPlan = {
+    qualityScore: 96,
+    entry: "1.34218",
+    stopLoss: "1.34052",
+    rr: "1:3.8",
+    tp1: "1.34716",
+    runner: "Next Liquidity",
+    breakEven: "RR2",
+    partialExit: "50% @ RR3",
+    strategy: "ICT 2022",
+};
+
 const EMPTY_BACKTEST: BacktestResult = {
     totalSignals: 0,
     wins: 0,
@@ -36,6 +68,47 @@ function mergeValidationHistory(current: ValidationRecord[], next: ValidationRec
 
 function formatTimestamp(value: number): string {
     return new Date(value).toLocaleTimeString();
+}
+
+function resolveMarketSymbol(symbol: string): string {
+    if (symbol.includes(".")) return symbol;
+    return `${symbol}.pro`;
+}
+
+function normalizeDecision(type?: string): ExplainableDecisionOutput["decision"] {
+    if (type === "BUY" || type === "SELL") return type;
+    return "WAIT";
+}
+
+function normalizeScannerDecision(type?: string): SmartScannerRow["decision"] {
+    if (type === "BUY" || type === "SELL") return type;
+    return "WAIT";
+}
+
+function buildFallbackReasons(input: {
+    trend: string;
+    bias: string;
+    score: number;
+    liquidityCount: number;
+    hasBos: boolean;
+    hasChoch: boolean;
+}): string[] {
+    return [
+        `Trend ${input.trend} with ${input.bias} bias in M5 context.`,
+        `Oscar score at ${input.score}/100 with ${input.liquidityCount} liquidity references detected.`,
+        `Structure signals: BOS ${input.hasBos ? "present" : "absent"}, CHOCH ${input.hasChoch ? "present" : "absent"}.`,
+    ];
+}
+
+function resolveRiskLevel(
+    decision: ExplainableDecisionOutput["decision"],
+    confidence: number,
+    score: number
+): ExplainableDecisionOutput["risk"] {
+    if (decision === "WAIT") return "High";
+    if (confidence >= 75 && score >= 80) return "Low";
+    if (confidence >= 60 && score >= 65) return "Medium";
+    return "High";
 }
 
 export default function Dashboard() {
@@ -184,8 +257,8 @@ export default function Dashboard() {
     return (
         <DecisionCenterLayout>
             <div className="grid gap-4 xl:grid-cols-12">
-                <div className="xl:col-span-8">
-                    <DecisionExplanationCard data={explainableDecision} />
+                <div className="xl:col-span-6">
+                    <DecisionExplanationCard data={explainableDecision} plan={MOCK_DECISION_PLAN} />
                 </div>
 
                 <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 xl:col-span-4">
@@ -284,11 +357,11 @@ export default function Dashboard() {
                     </div>
                 </section>
 
-                <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-2 xl:col-span-8">
-                    <TradingChart candles={snapshot.timeframes.M5.candles} />
+                <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-2 xl:col-span-9">
+                    <TradingChart candles={snapshot.timeframes.M5.candles} height={760} />
                 </section>
 
-                <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 xl:col-span-4">
+                <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 xl:col-span-3">
                     <h2 className="mb-4 text-lg font-semibold">Validation & Backtest</h2>
                     <div className="space-y-2 text-sm">
                         <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">

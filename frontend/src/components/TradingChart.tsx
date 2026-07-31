@@ -16,10 +16,12 @@ import SmartMoneyOverlay from "./SmartMoneyOverlay";
 
 type Props = {
     candles: CandleResponse[];
+    height?: number;
 };
 
 export default function TradingChart({
     candles,
+    height = 650,
 }: Props) {
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -39,7 +41,7 @@ export default function TradingChart({
             containerRef.current,
             {
                 width: containerRef.current.clientWidth,
-                height: 650,
+                height,
 
                 layout: {
                     background: {
@@ -122,7 +124,7 @@ export default function TradingChart({
 
         };
 
-    }, []);
+    }, [height]);
 
     useEffect(() => {
 
