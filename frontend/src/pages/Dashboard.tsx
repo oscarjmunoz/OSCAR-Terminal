@@ -1,9 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 
-<<<<<<< HEAD
-=======
-import SmartScanner from "../components/SmartScanner";
->>>>>>> feature/scanner-service
 import TradingChart from "../components/TradingChart";
 import { LiveDataOrchestrator } from "../core/LiveDataOrchestrator";
 import { ExplainableDecisionOutput, MarketSnapshot, OrchestratedEngineOutput } from "../core/types";
@@ -14,19 +10,7 @@ import { runValidationEngine } from "../engine/validation/ValidationEngine";
 import { ValidationRecord } from "../engine/validation/types";
 import DecisionCenterLayout from "../layouts/DecisionCenterLayout";
 
-<<<<<<< HEAD
 const DEFAULT_SYMBOL = "USDCHF.pro";
-=======
-const DEFAULT_SYMBOL = "USDCHF";
-const SYMBOL_TO_MARKET: Record<string, string> = {
-    EURUSD: "EURUSD.pro",
-    GBPUSD: "GBPUSD.pro",
-    USDCHF: "USDCHF.pro",
-    XAUUSD: "XAUUSD",
-    NAS100: "NAS100",
-};
-
->>>>>>> feature/scanner-service
 const EMPTY_BACKTEST: BacktestResult = {
     totalSignals: 0,
     wins: 0,
@@ -54,13 +38,6 @@ function formatTimestamp(value: number): string {
     return new Date(value).toLocaleTimeString();
 }
 
-<<<<<<< HEAD
-=======
-function resolveMarketSymbol(scannerSymbol: string): string {
-    return SYMBOL_TO_MARKET[scannerSymbol] ?? scannerSymbol;
-}
-
->>>>>>> feature/scanner-service
 export default function Dashboard() {
     const orchestratorRef = useRef<LiveDataOrchestrator | null>(null);
     const validationHistoryRef = useRef<ValidationRecord[]>([]);
@@ -70,6 +47,7 @@ export default function Dashboard() {
     const [validationHistory, setValidationHistory] = useState<ValidationRecord[]>([]);
     const [backtestResult, setBacktestResult] = useState<BacktestResult>(EMPTY_BACKTEST);
     const [selectedScannerSymbol, setSelectedScannerSymbol] = useState(DEFAULT_SYMBOL);
+    const [scannerRows, setScannerRows] = useState<SmartScannerRow[]>(MOCK_SCANNER_ROWS);
     const [loading, setLoading] = useState(true);
 
     if (!orchestratorRef.current) {
@@ -91,6 +69,27 @@ export default function Dashboard() {
                 const engineOutput = orchestrator.runEngines(newSnapshot);
                 setSnapshot(newSnapshot);
                 setOutput(engineOutput);
+
+                setScannerRows((current) =>
+                    current.map((row) => {
+                        if (row.symbol !== selectedScannerSymbol) {
+                            return row;
+                        }
+
+                        const liveDecision = engineOutput.institutional.M5.decision;
+                        const liveContext = engineOutput.institutional.M5.context;
+                        const liveScore = engineOutput.institutional.M5.score;
+
+                        return {
+                            ...row,
+                            decision: normalizeScannerDecision(liveDecision?.type),
+                            confidence: liveDecision?.confidence ?? row.confidence,
+                            score: liveScore?.score ?? row.score,
+                            trend: liveContext?.trend ?? row.trend,
+                            source: "PIPELINE",
+                        };
+                    })
+                );
 
                 const latestValidation = runValidationEngine({
                     analysis: engineOutput.institutional.M5,
@@ -246,33 +245,89 @@ export default function Dashboard() {
                 </section>
 
                 <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 xl:col-span-4">
-<h2 className="mb-4 text-lg font-semibold">Estado del Sistema</h2>
+                    <h2 className="mb-4 text-lg font-semibold">Estado del Sistema</h2>
+                    <div className="space-y-2 text-sm">
+                        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
+                            <span className="text-slate-400">MT5</span>
+                            <span className={snapshot.status?.connected ? "font-semibold text-emerald-400" : "font-semibold text-rose-400"}>
+                                {snapshot.status?.connected ? "Conectado" : "Offline"}
+                            </span>
+                        </div>
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                            <p className="text-xs text-slate-400">FVG</p>
+                            <p className="mt-1 text-sm font-semibold">{fvgSummary}</p>
+                        </div>
+                        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
+                            <span className="text-slate-400">Simbolo</span>
+                            <span className="font-semibold">{snapshot.symbol}</span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
+                            <span className="text-slate-400">Timeframe</span>
+                            <span className="font-semibold">M5</span>
+                        </div>
+                    </div>
+                </section>
 
-<SmartScanner
-    selectedSymbol={selectedScannerSymbol}
-    onSelect={setSelectedScannerSymbol}
-/>
+                <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 xl:col-span-7">
+                    <h2 className="mb-4 text-lg font-semibold">Panel de Analisis</h2>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm">
+                            <p className="text-xs text-slate-400">Trend / Bias / Phase</p>
+                            <p className="mt-1 font-semibold">{context?.trend ?? "RANGE"}</p>
+                            <p className="font-semibold">{context?.bias ?? "NEUTRAL"}</p>
+                            <p className="font-semibold">{context?.phase ?? "ACCUMULATION"}</p>
+                        </div>
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm">
+                            <p className="text-xs text-slate-400">Premium / Discount</p>
+                            <p className="mt-1 text-sm font-semibold">{premiumDiscountValue}</p>
+                        </div>
+                    </div>
+                </section>
 
-<div className="mt-4 space-y-2 text-sm">
-    <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
-        <span className="text-slate-400">MT5</span>
-        <span className={snapshot.status?.connected ? "font-semibold text-emerald-400" : "font-semibold text-rose-400"}>
-            {snapshot.status?.connected ? "Conectado" : "Offline"}
-        </span>
-    </div>
+                <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-2 xl:col-span-8">
+                    <TradingChart candles={snapshot.timeframes.M5.candles} />
+                </section>
 
-    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-        <p className="text-xs text-slate-400">FVG</p>
-        <p className="mt-1 text-sm font-semibold">{fvgSummary}</p>
-    </div>
+                <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 xl:col-span-4">
+                    <h2 className="mb-4 text-lg font-semibold">Validation & Backtest</h2>
+                    <div className="space-y-2 text-sm">
+                        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
+                            <span className="text-slate-400">Latest Signal</span>
+                            <span className="font-semibold">{latestSignal?.decision ?? decisionType}</span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
+                            <span className="text-slate-400">Win Rate</span>
+                            <span className="font-semibold">{backtestResult.winRate}%</span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
+                            <span className="text-slate-400">Profit Factor</span>
+                            <span className="font-semibold">{backtestResult.profitFactor}</span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
+                            <span className="text-slate-400">Total Signals</span>
+                            <span className="font-semibold">{backtestResult.totalSignals}</span>
+                        </div>
+                    </div>
+                </section>
 
-    <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
-        <span className="text-slate-400">Símbolo</span>
-        <span className="font-semibold">{snapshot.symbol}</span>
-    </div>
-
-    <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
-        <span className="text-slate-400">Timeframe</span>
-        <span className="font-semibold">M5</span>
-    </div>
-</div>
+                <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 xl:col-span-12">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {FOOTER_TABS.map((tab, index) => (
+                            <button
+                                key={tab}
+                                type="button"
+                                className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+                                    index === 0
+                                        ? "border-sky-500/40 bg-sky-500/10 text-sky-200"
+                                        : "border-slate-700 bg-slate-950/60 text-slate-300 hover:border-slate-600"
+                                }`}
+                            >
+                                {tab}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+            </div>
+        </DecisionCenterLayout>
+    );
+}
