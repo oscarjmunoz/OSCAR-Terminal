@@ -42,3 +42,16 @@ export interface OrchestratedEngineOutput {
   mtf: MultiTimeframeAnalysis;
   journalEntries: JournalEntry[];
 }
+
+export type ExplainableRiskLevel = "Low" | "Medium" | "High";
+
+export interface ExplainableDecisionOutput {
+  decision: "BUY" | "SELL" | "WAIT";
+  confidence: number;
+  score: number;
+  reasons: string[];
+  risk: ExplainableRiskLevel;
+  invalidation: string;
+  expectedRR: string;
+  strategy: string;
+}
