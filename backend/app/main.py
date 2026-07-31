@@ -63,3 +63,17 @@ async def root():
         "status": "running",
 
     }
+
+
+@app.get("/health")
+async def health():
+
+    return {
+
+        "status": "ok",
+
+        "service": "OSCAR Terminal",
+
+        "version": settings.APP_VERSION,
+
+    }

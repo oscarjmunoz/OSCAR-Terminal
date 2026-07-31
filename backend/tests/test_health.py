@@ -12,3 +12,16 @@ def test_health():
     assert response.status_code == 200
 
     assert response.json()["status"] == "ok"
+
+
+def test_root_health():
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["status"] == "ok"
+    assert payload["service"] == "OSCAR Terminal"
+    assert "version" in payload
