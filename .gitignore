@@ -1,0 +1,15 @@
+# Frontend
+frontend/dist/
+frontend/node_modules/
+frontend/.vite/
+
+# Backend
+backend/__pycache__/
+backend/.pytest_cache/
+backend/.venv/
+*.pyc
+
+# General
+node_modules/
+dist/
+.vite/
