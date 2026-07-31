@@ -1,27 +1,43 @@
-export type SmartScannerDecision = "BUY" | "SELL" | "WAIT";
+import { useEffect, useMemo, useState } from "react";
 
-export interface SmartScannerRow {
-  symbol: string;
-  decision: SmartScannerDecision;
-  score: number;
-  confidence: number;
-  trend: string;
-  source: "MOCK" | "PIPELINE";
-}
+import { ScannerItem } from "../models/ScannerItem";
+import { ScannerService } from "../services/scanner";
 
 type Props = {
-  rows: SmartScannerRow[];
   selectedSymbol: string;
   onSelect: (symbol: string) => void;
 };
 
-function decisionTone(decision: SmartScannerDecision): string {
+function decisionTone(decision: ScannerItem["decision"]): string {
   if (decision === "BUY") return "text-emerald-300";
   if (decision === "SELL") return "text-rose-300";
   return "text-amber-300";
 }
 
-export default function SmartScanner({ rows, selectedSymbol, onSelect }: Props) {
+export default function SmartScanner({ selectedSymbol, onSelect }: Props) {
+  const service = useMemo(() => new ScannerService(), []);
+  const [rows, setRows] = useState<ScannerItem[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadRows() {
+      try {
+        const scannerItems = await service.getScannerItems();
+        if (!mounted) return;
+        setRows(scannerItems);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    loadRows();
+
+    return () => {
+      mounted = false;
+    };
+  }, [service]);
+
   return (
     <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
       <div className="mb-4 flex items-center justify-between">
