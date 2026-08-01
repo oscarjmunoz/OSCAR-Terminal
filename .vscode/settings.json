@@ -1,39 +1,65 @@
 {
+    "python.defaultInterpreterPath": "${workspaceFolder}/../.venvs/oscar-terminal/Scripts/python.exe",
+    "python.analysis.indexing": false,
+    "python.analysis.diagnosticMode": "openFilesOnly",
+    "python.analysis.autoImportCompletions": false,
+    "python.analysis.userFileIndexingLimit": 200,
+    "typescript.disableAutomaticTypeAcquisition": true,
+    "typescript.tsserver.maxTsServerMemory": 768,
+    "js/ts.tsserver.maxMemory": 768,
+    "git.autofetch": false,
+    "git.autorefresh": false,
+    "extensions.autoUpdate": false,
+    "extensions.autoCheckUpdates": false,
+    "editor.minimap.enabled": false,
+    "editor.codeLens": false,
+    "editor.semanticHighlighting.enabled": false,
+    "editor.inlayHints.enabled": "off",
+    "breadcrumbs.enabled": false,
+    "explorer.autoReveal": false,
     "files.exclude": {
-        "**/.git": true,
-        "**/node_modules": true,
-        "**/dist": true,
-        "**/__pycache__": true,
-        "**/.pytest_cache": true,
-        "**/.venv": true,
-        "**/*.pyc": true
-    },
-
-    "search.exclude": {
-        "**/.git": true,
-        "**/node_modules": true,
-        "**/dist": true,
-        "**/__pycache__": true,
-        "**/.pytest_cache": true,
-        "**/.venv": true
-    },
-
-    "files.watcherExclude": {
         "**/.git/**": true,
-        "**/node_modules/**": true,
-        "**/dist/**": true,
+        "**/.venv/**": true,
         "**/__pycache__/**": true,
         "**/.pytest_cache/**": true,
-        "**/.venv/**": true
+        "**/.mypy_cache/**": true,
+        "**/.ruff_cache/**": true,
+        "**/coverage/**": true,
+        "**/logs/**": true,
+        "**/node_modules/**": true,
+        "**/dist/**": true,
+        "**/build/**": true,
+        "**/.vite/**": true,
+        "**/*.pyc": true
     },
-
-    "typescript.tsserver.maxTsServerMemory": 2048,
-
-    "typescript.disableAutomaticTypeAcquisition": true,
-
-    "editor.codeLens": false,
-
-    "git.autorefresh": true,
-
-    "git.autofetch": false
+    "search.exclude": {
+        "**/.git/**": true,
+        "**/.venv/**": true,
+        "**/__pycache__/**": true,
+        "**/.pytest_cache/**": true,
+        "**/.mypy_cache/**": true,
+        "**/.ruff_cache/**": true,
+        "**/coverage/**": true,
+        "**/logs/**": true,
+        "**/node_modules/**": true,
+        "**/dist/**": true,
+        "**/build/**": true,
+        "**/.vite/**": true,
+        "**/*.pyc": true
+    },
+    "files.watcherExclude": {
+        "**/.git/**": true,
+        "**/.venv/**": true,
+        "**/__pycache__/**": true,
+        "**/.pytest_cache/**": true,
+        "**/.mypy_cache/**": true,
+        "**/.ruff_cache/**": true,
+        "**/coverage/**": true,
+        "**/logs/**": true,
+        "**/node_modules/**": true,
+        "**/dist/**": true,
+        "**/build/**": true,
+        "**/.vite/**": true,
+        "**/*.pyc": true
+    }
 }

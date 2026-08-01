@@ -1,0 +1,56 @@
+{
+  "folders": [
+    {
+      "name": "docs",
+      "path": "docs"
+    }
+  ],
+  "settings": {
+    "python.defaultInterpreterPath": "${workspaceFolder:docs}/../../.venvs/oscar-terminal/Scripts/python.exe",
+    "files.exclude": {
+      "**/.git/**": true,
+      "**/.venv/**": true,
+      "**/__pycache__/**": true,
+      "**/.pytest_cache/**": true,
+      "**/.mypy_cache/**": true,
+      "**/.ruff_cache/**": true,
+      "**/coverage/**": true,
+      "**/logs/**": true,
+      "**/node_modules/**": true,
+      "**/dist/**": true,
+      "**/build/**": true,
+      "**/.vite/**": true,
+      "**/*.pyc": true
+    },
+    "search.exclude": {
+      "**/.git/**": true,
+      "**/.venv/**": true,
+      "**/__pycache__/**": true,
+      "**/.pytest_cache/**": true,
+      "**/.mypy_cache/**": true,
+      "**/.ruff_cache/**": true,
+      "**/coverage/**": true,
+      "**/logs/**": true,
+      "**/node_modules/**": true,
+      "**/dist/**": true,
+      "**/build/**": true,
+      "**/.vite/**": true,
+      "**/*.pyc": true
+    },
+    "files.watcherExclude": {
+      "**/.git/**": true,
+      "**/.venv/**": true,
+      "**/__pycache__/**": true,
+      "**/.pytest_cache/**": true,
+      "**/.mypy_cache/**": true,
+      "**/.ruff_cache/**": true,
+      "**/coverage/**": true,
+      "**/logs/**": true,
+      "**/node_modules/**": true,
+      "**/dist/**": true,
+      "**/build/**": true,
+      "**/.vite/**": true,
+      "**/*.pyc": true
+    }
+  }
+}

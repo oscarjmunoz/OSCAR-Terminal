@@ -32,3 +32,7 @@ Para detener servicios:
 ## Documentacion
 
 La documentacion oficial del proyecto esta en [docs/](docs/).
+
+### Gobierno arquitectonico
+
+- Charter del proyecto: [docs/architecture/OSCAR_CHARTER.md](docs/architecture/OSCAR_CHARTER.md)

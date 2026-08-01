@@ -1,0 +1,78 @@
+{
+    "folders": [
+        {
+            "name": "backend",
+            "path": "backend"
+        },
+        {
+            "name": "tests",
+            "path": "backend/tests"
+        }
+    ],
+    "settings": {
+        "python.defaultInterpreterPath": "${workspaceFolder:backend}/../../.venvs/oscar-terminal/Scripts/python.exe",
+        "files.exclude": {
+            "**/.git/**": true,
+            "**/.venv/**": true,
+            "**/__pycache__/**": true,
+            "**/*.pyc": true,
+            "**/.pytest_cache/**": true,
+            "**/.mypy_cache/**": true,
+            "**/.ruff_cache/**": true,
+            "**/coverage/**": true,
+            "**/htmlcov/**": true,
+            "**/logs/**": true,
+            "**/node_modules/**": true,
+            "**/dist/**": true,
+            "**/build/**": true,
+            "**/.vite/**": true
+        },
+        "search.exclude": {
+            "**/.git/**": true,
+            "**/.venv/**": true,
+            "**/__pycache__/**": true,
+            "**/*.pyc": true,
+            "**/.pytest_cache/**": true,
+            "**/.mypy_cache/**": true,
+            "**/.ruff_cache/**": true,
+            "**/coverage/**": true,
+            "**/htmlcov/**": true,
+            "**/logs/**": true,
+            "**/node_modules/**": true,
+            "**/dist/**": true,
+            "**/build/**": true,
+            "**/.vite/**": true
+        },
+        "files.watcherExclude": {
+            "**/.git/**": true,
+            "**/.venv/**": true,
+            "**/__pycache__/**": true,
+            "**/*.pyc": true,
+            "**/.pytest_cache/**": true,
+            "**/.mypy_cache/**": true,
+            "**/.ruff_cache/**": true,
+            "**/coverage/**": true,
+            "**/htmlcov/**": true,
+            "**/logs/**": true,
+            "**/node_modules/**": true,
+            "**/dist/**": true,
+            "**/build/**": true,
+            "**/.vite/**": true
+        },
+        "python.analysis.indexing": false,
+        "python.analysis.userFileIndexingLimit": 200,
+        "python.analysis.diagnosticMode": "openFilesOnly",
+        "python.analysis.autoImportCompletions": false,
+        "editor.codeLens": false,
+        "editor.minimap.enabled": false,
+        "editor.semanticHighlighting.enabled": false,
+        "editor.stickyScroll.enabled": false,
+        "breadcrumbs.enabled": false,
+        "git.autorefresh": false,
+        "git.autofetch": false,
+        "git.decorations.enabled": false,
+        "git.untrackedChanges": "hidden",
+        "typescript.disableAutomaticTypeAcquisition": true,
+        "js/ts.tsserver.maxMemory": 768
+    }
+}
