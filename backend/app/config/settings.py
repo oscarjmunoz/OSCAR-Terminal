@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     PORT: int = 8000
     DEBUG: bool = True
 
+    healthCheckInterval: int = 5
+    pipelineTimeout: int = 30
+    tickTimeout: int = 15
+    maxSlippage: int = 20
+    magicNumber: int = 240803
+    defaultDeviation: int = 10
+
     DATABASE_URL: str = f"sqlite:///{DATABASE_PATH.as_posix()}"
 
 
