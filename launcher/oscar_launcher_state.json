@@ -1,0 +1,25 @@
+{
+  "startedAt": 1785901598,
+  "backend": {
+    "pid": 396,
+    "cwd": "D:\\OSCAR-Terminal\\backend",
+    "command": [
+      "D:\\OSCAR-Terminal\\.venv\\Scripts\\python.exe",
+      "run.py"
+    ]
+  },
+  "frontend": {
+    "pid": 11924,
+    "cwd": "D:\\OSCAR-Terminal\\frontend",
+    "command": [
+      "C:\\Program Files\\nodejs\\npm.cmd",
+      "run",
+      "dev",
+      "--",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "5173"
+    ]
+  }
+}

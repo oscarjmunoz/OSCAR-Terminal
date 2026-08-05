@@ -124,11 +124,18 @@ def _check_node() -> tuple[bool, str | None]:
 
 def _check_backend_dependencies(python_exec: str) -> bool:
     import_script = (
-        "import importlib,sys;"
-        "mods=['fastapi','uvicorn','pydantic','pydantic_settings','dotenv','sqlalchemy','httpx'];"
-        "missing=[m for m in mods if importlib.util.find_spec(m) is None];"
-        "print(','.join(missing));"
-        "sys.exit(1 if missing else 0)"
+        "try:\n"
+        "    import fastapi\n"
+        "    import uvicorn\n"
+        "    import pydantic\n"
+        "    import pydantic_settings\n"
+        "    import dotenv\n"
+        "    import sqlalchemy\n"
+        "    import httpx\n"
+        "except ImportError as e:\n"
+        "    print(e.name)\n"
+        "    raise SystemExit(1)\n"
+        "raise SystemExit(0)"
     )
     completed = subprocess.run(
         [python_exec, "-c", import_script],
