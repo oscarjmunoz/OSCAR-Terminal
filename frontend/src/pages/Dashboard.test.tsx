@@ -3,9 +3,9 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 
 import Dashboard from "./Dashboard";
 
-import { getAnalyticsBehaviour, getAnalyticsPerformance, getAnalyticsSessions, getAnalyticsSetups } from "../api/analytics";
+import { getAnalyticsPerformance } from "../api/analytics";
 import { getLiveDecisionReport } from "../api/decision";
-import { getHealth, getOperationalReadiness } from "../api/health";
+import { getOperationalReadiness } from "../api/health";
 import { getJournalEntries } from "../api/journal";
 import { getStatus, getTick } from "../api/market";
 import { evaluatePlaybookMatches, getPlaybookSetups } from "../api/playbook";
@@ -25,7 +25,6 @@ vi.mock("../api/market", () => ({
 }));
 
 vi.mock("../api/health", () => ({
-    getHealth: vi.fn(),
     getOperationalReadiness: vi.fn(),
 }));
 
@@ -40,9 +39,6 @@ vi.mock("../api/playbook", () => ({
 
 vi.mock("../api/analytics", () => ({
     getAnalyticsPerformance: vi.fn(),
-    getAnalyticsSessions: vi.fn(),
-    getAnalyticsBehaviour: vi.fn(),
-    getAnalyticsSetups: vi.fn(),
 }));
 
 const liveDecisionReport = {
@@ -88,7 +84,6 @@ const liveDecisionReport = {
     },
     confluences: [
         { name: "Trend alignment", detected: true, importance: "HIGH", explanation: "Trend and side align." },
-        { name: "Liquidity sweep", detected: false, importance: "MEDIUM", explanation: "Sweep pending." },
     ],
     risk_assessment: {
         rr_expected: 2.1,
@@ -171,41 +166,33 @@ const readiness = {
     overallStatus: "GREEN",
     items: [
         { key: "mt5", label: "MT5", status: "GREEN", detail: "Terminal connected and responding.", observedAt: null },
-        { key: "broker", label: "Broker", status: "GREEN", detail: "Broker X · Demo-01", observedAt: null },
-        { key: "market-feed", label: "Market Feed", status: "YELLOW", detail: "Feed is slightly delayed.", observedAt: null },
-        { key: "last-tick", label: "Last Tick", status: "GREEN", detail: "Last tick observed at 2026-08-04T10:09:59Z", observedAt: "2026-08-04T10:09:59Z" },
-        { key: "last-candle", label: "Last Candle", status: "GREEN", detail: "Last candle observed at 2026-08-04T10:05:00Z", observedAt: "2026-08-04T10:05:00Z" },
-        { key: "decision-center", label: "Decision Center", status: "GREEN", detail: "Live context refreshed.", observedAt: "2026-08-04T10:09:59Z" },
-        { key: "journal", label: "Journal", status: "GREEN", detail: "1 historical entry available.", observedAt: null },
-        { key: "playbook", label: "Playbook", status: "GREEN", detail: "1 enabled setup available.", observedAt: null },
-        { key: "analytics", label: "Analytics", status: "GREEN", detail: "Analytics built from 8 tracked trades.", observedAt: null },
     ],
 };
 
 beforeEach(() => {
+    window.localStorage.clear();
+
     vi.mocked(getOperationalSettings).mockResolvedValue({
         defaultSymbol: "EURUSD",
         defaultTimeframe: "M5",
         availableSymbols: ["EURUSD", "GBPUSD", "USDJPY"],
         availableTimeframes: ["M1", "M5", "H1"],
     });
+
     vi.mocked(getStatus).mockResolvedValue({
         connected: true,
         account: 123456,
         company: "Broker X",
         server: "Demo-01",
     });
+
     vi.mocked(getTick).mockResolvedValue({
         symbol: "EURUSD",
         bid: 1.0888,
         ask: 1.089,
         spread: 2,
     });
-    vi.mocked(getHealth).mockResolvedValue({
-        status: "ok",
-        service: "OSCAR Terminal",
-        version: "1.0.0-rc1",
-    });
+
     vi.mocked(getOperationalReadiness).mockResolvedValue(readiness);
     vi.mocked(getLiveDecisionReport).mockResolvedValue(liveDecisionReport);
     vi.mocked(getJournalEntries).mockResolvedValue([journalEntry]);
@@ -242,65 +229,31 @@ beforeEach(() => {
         netRR: 9.5,
         averageDuration: 38,
     });
-    vi.mocked(getAnalyticsSessions).mockResolvedValue([
-        { session: "ASIA", totalTrades: 2, winRate: 50, averageRR: 0.9 },
-        { session: "LONDON", totalTrades: 4, winRate: 75, averageRR: 2.1 },
-    ]);
-    vi.mocked(getAnalyticsBehaviour).mockResolvedValue([
-        { behaviour: "FOLLOWED_OSCAR", totalTrades: 5, winRate: 80, averageRR: 2.3, netRR: 11.5 },
-        { behaviour: "WAITED", totalTrades: 3, winRate: 40, averageRR: 0.8, netRR: 2.1 },
-    ]);
-    vi.mocked(getAnalyticsSetups).mockResolvedValue([
-        { setupId: "setup-1", setupName: "London Breakout", totalTrades: 8, winRate: 62.5, averageRR: 1.9, averageMatchPercentage: 88.2 },
-    ]);
 });
 
 describe("Dashboard", () => {
-    it("renders the loading state immediately", () => {
+    it("renders skeleton loading state immediately", () => {
         render(<Dashboard />);
 
-        expect(screen.getByText("Loading OSCAR Terminal")).toBeInTheDocument();
+        expect(screen.getByTestId("dashboard-skeleton")).toBeInTheDocument();
     });
 
-    it("renders empty states for missing optional historical data", async () => {
-        vi.mocked(getJournalEntries).mockResolvedValueOnce([]);
-        vi.mocked(getPlaybookSetups).mockResolvedValueOnce([]);
-        vi.mocked(evaluatePlaybookMatches).mockResolvedValueOnce([]);
-        vi.mocked(getAnalyticsPerformance).mockResolvedValueOnce(null as never);
-        vi.mocked(getAnalyticsSessions).mockResolvedValueOnce([]);
-        vi.mocked(getAnalyticsBehaviour).mockResolvedValueOnce([]);
-        vi.mocked(getAnalyticsSetups).mockResolvedValueOnce([]);
-        vi.mocked(getOperationalReadiness).mockResolvedValueOnce({
-            ...readiness,
-            items: readiness.items.map((item) => item.key === "journal" ? { ...item, status: "YELLOW", detail: "No historical entries exist yet." } : item),
-        });
-
-        render(<Dashboard />);
-
-        expect(await screen.findByTestId("decision-center")).toBeInTheDocument();
-        expect(screen.getByText("No playbooks configured")).toBeInTheDocument();
-        expect(screen.getByText("No analytics")).toBeInTheDocument();
-        expect(screen.getByText("No journal")).toBeInTheDocument();
-    });
-
-    it("renders the live dashboard using the current DecisionReport instead of the journal snapshot", async () => {
+    it("renders institutional zones from live report", async () => {
         render(<Dashboard />);
 
         const decisionPanel = await screen.findByTestId("decision-center");
         expect(within(decisionPanel).getByText("WAIT")).toBeInTheDocument();
-        expect(within(decisionPanel).getByText("BEARISH")).toBeInTheDocument();
-        expect(within(decisionPanel).getByText("78")).toBeInTheDocument();
         expect(within(decisionPanel).getByText("68.40%")).toBeInTheDocument();
 
+        expect(screen.getByTestId("trading-bar")).toBeInTheDocument();
+        expect(screen.getByTestId("market-snapshot")).toHaveTextContent("Institutional Score");
         expect(screen.getByTestId("playbook-panel")).toHaveTextContent("London Breakout");
-        expect(screen.getByTestId("risk-panel")).toHaveTextContent("2.10");
-        expect(screen.getByTestId("narrative-panel")).toHaveTextContent("Live bearish context");
-        expect(screen.getByTestId("analytics-panel")).toHaveTextContent("62.50%");
-        expect(screen.getByTestId("journal-panel")).toHaveTextContent("Execution was clean.");
-        expect(screen.getByTestId("health-panel")).toHaveTextContent("Decision Center");
+        expect(screen.getByTestId("performance-panel")).toHaveTextContent("Profit Factor");
+        expect(screen.getByTestId("risk-panel")).toHaveTextContent("Expected RR");
+        expect(screen.getByTestId("checklist-panel")).toHaveTextContent("Trend aligned");
     });
 
-    it("requests a fresh live report when the trader changes timeframe and when Analyze Market is clicked", async () => {
+    it("requests a fresh live report when timeframe changes and when Analyze Market is clicked", async () => {
         render(<Dashboard />);
 
         await screen.findByTestId("analysis-controls");
@@ -321,5 +274,47 @@ describe("Dashboard", () => {
         await waitFor(() => {
             expect(vi.mocked(getLiveDecisionReport).mock.calls.length).toBeGreaterThan(callsAfterSelection);
         });
+    });
+
+    it("activates focus mode and hides non-essential zones", async () => {
+        render(<Dashboard />);
+
+        await screen.findByTestId("decision-center");
+        fireEvent.click(screen.getByRole("button", { name: "Focus Mode" }));
+
+        await waitFor(() => {
+            expect(screen.queryByTestId("market-snapshot")).not.toBeInTheDocument();
+            expect(screen.queryByTestId("playbook-panel")).not.toBeInTheDocument();
+            expect(screen.queryByTestId("performance-panel")).not.toBeInTheDocument();
+        });
+
+        expect(screen.getByTestId("risk-panel")).toBeInTheDocument();
+        expect(screen.getByTestId("narrative-panel")).toBeInTheDocument();
+        expect(screen.getByTestId("checklist-panel")).toBeInTheDocument();
+    });
+
+    it("stores symbol favorites in localStorage", async () => {
+        render(<Dashboard />);
+
+        await screen.findByTestId("favorites-panel");
+        const starToggle = screen.getByLabelText("Toggle GBPUSD favorite");
+        fireEvent.click(starToggle);
+
+        const raw = window.localStorage.getItem("oscar.favoriteSymbols.v1");
+        expect(raw).not.toBeNull();
+        expect(raw).toContain("GBPUSD");
+    });
+
+    it("shows graceful empty states for optional history", async () => {
+        vi.mocked(getJournalEntries).mockResolvedValueOnce([]);
+        vi.mocked(getPlaybookSetups).mockResolvedValueOnce([]);
+        vi.mocked(evaluatePlaybookMatches).mockResolvedValueOnce([]);
+        vi.mocked(getAnalyticsPerformance).mockResolvedValueOnce(null as never);
+
+        render(<Dashboard />);
+
+        await screen.findByTestId("decision-center");
+        expect(screen.getByText("Biblioteca en crecimiento")).toBeInTheDocument();
+        expect(screen.getByText("Esperando track record")).toBeInTheDocument();
     });
 });
