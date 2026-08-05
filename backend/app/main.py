@@ -1,8 +1,11 @@
 # backend/app/main.py
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.health import build_health_payload
 from app.api.router import api_router
 
 from app.config.settings import settings
@@ -19,10 +22,20 @@ logger.info("Starting OSCAR Terminal...")
 
 Base.metadata.create_all(bind=engine)
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    logger.info("Backend started successfully.")
+    try:
+        yield
+    finally:
+        logger.info("Backend stopped.")
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     debug=settings.DEBUG,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -39,18 +52,6 @@ app.add_middleware(
 app.include_router(api_router)
 
 
-@app.on_event("startup")
-async def startup_event():
-
-    logger.info("Backend started successfully.")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-
-    logger.info("Backend stopped.")
-
-
 @app.get("/")
 async def root():
 
@@ -63,3 +64,8 @@ async def root():
         "status": "running",
 
     }
+
+
+@app.get("/health")
+async def root_health():
+    return build_health_payload()

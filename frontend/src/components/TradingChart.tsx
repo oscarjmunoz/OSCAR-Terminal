@@ -18,10 +18,14 @@ import SwingLayer from "./SwingLayer";
 
 type Props = {
     candles: CandleResponse[];
+    symbol: string;
+    timeframe: string;
 };
 
 export default function TradingChart({
     candles,
+    symbol,
+    timeframe,
 }: Props) {
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -162,7 +166,7 @@ export default function TradingChart({
 
             try {
 
-                const data = await getSwings();
+                const data = await getSwings(symbol, timeframe);
 
                 setSwings(data);
 
@@ -178,14 +182,33 @@ export default function TradingChart({
 
         loadSwings();
 
-    }, [candles]);
+    }, [candles, symbol, timeframe]);
 
     return (
 
-        <>
+        <div className="chart-frame" data-testid="chart-area">
+
+            <div className="chart-frame__header">
+
+                <div>
+
+                    <p className="panel__eyebrow">Chart Area</p>
+
+                    <h2 className="panel__title">{symbol} · {timeframe}</h2>
+
+                </div>
+
+                <div className="chart-frame__live">
+
+                    LIVE
+
+                </div>
+
+            </div>
 
             <div
                 ref={containerRef}
+                className="chart-frame__body"
             />
 
             <SwingLayer
@@ -198,7 +221,7 @@ export default function TradingChart({
 
             />
 
-        </>
+        </div>
 
     );
 

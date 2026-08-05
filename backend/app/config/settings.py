@@ -12,7 +12,7 @@ DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
 class Settings(BaseSettings):
 
     APP_NAME: str = "OSCAR Terminal"
-    APP_VERSION: str = "0.1.0-alpha"
+    APP_VERSION: str = "1.0.0-rc1"
 
     HOST: str = "127.0.0.1"
     PORT: int = 8000
@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     maxSlippage: int = 20
     magicNumber: int = 240803
     defaultDeviation: int = 10
+    defaultSymbol: str = "EURUSD"
+    defaultTimeframe: str = "M5"
+    availableSymbols: str = "EURUSD,GBPUSD,USDJPY,XAUUSD,NAS100,US30,USDCHF"
 
     DATABASE_URL: str = f"sqlite:///{DATABASE_PATH.as_posix()}"
 
