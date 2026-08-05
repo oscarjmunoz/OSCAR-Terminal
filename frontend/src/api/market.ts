@@ -35,10 +35,10 @@ export async function getStatus(): Promise<TerminalStatus> {
 
 }
 
-export async function getTick(): Promise<TickResponse> {
+export async function getTick(symbol: string = "USDCHF"): Promise<TickResponse> {
 
     const response = await api.get<TickResponse>(
-        "/market/tick/USDCHF"
+        `/market/tick/${symbol}`
     );
 
     return response.data;
@@ -46,12 +46,13 @@ export async function getTick(): Promise<TickResponse> {
 }
 
 export async function getCandles(
+    symbol: string = "USDCHF",
     timeframe: string = "M5",
     count: number = 200,
 ): Promise<CandleResponse[]> {
 
     const response = await api.get<CandleResponse[]>(
-        `/market/candles/USDCHF/${timeframe}?count=${count}`
+        `/market/candles/${symbol}/${timeframe}?count=${count}`
     );
 
     return response.data;

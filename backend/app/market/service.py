@@ -88,6 +88,54 @@ class MarketService:
         )
 
     @classmethod
+    def latest_tick_time(cls, symbol: str):
+
+        if not cls.initialize():
+            return None
+
+        real_symbol = cls._resolve_symbol(symbol)
+
+        if real_symbol is None:
+            return None
+
+        mt5.symbol_select(real_symbol, True)
+
+        tick = mt5.symbol_info_tick(real_symbol)
+
+        if tick is None or getattr(tick, "time", None) is None:
+            return None
+
+        return datetime.fromtimestamp(int(tick.time))
+
+    @classmethod
+    def latest_candle_time(cls, symbol: str, timeframe: str):
+
+        if not cls.initialize():
+            return None
+
+        real_symbol = cls._resolve_symbol(symbol)
+
+        if real_symbol is None:
+            return None
+
+        tf = TIMEFRAMES.get(timeframe.upper())
+
+        if tf is None:
+            return None
+
+        rates = mt5.copy_rates_from_pos(
+            real_symbol,
+            tf,
+            0,
+            1,
+        )
+
+        if rates is None or len(rates) == 0:
+            return None
+
+        return datetime.fromtimestamp(int(rates[-1]["time"]))
+
+    @classmethod
     def candles(cls, symbol: str, timeframe: str, count: int = 200):
 
         if not cls.initialize():
