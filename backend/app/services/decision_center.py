@@ -20,6 +20,7 @@ from app.schemas.decision_center import QualityLevel
 from app.schemas.decision_center import RecommendationType
 from app.schemas.decision_center import RiskAssessmentReport
 from app.schemas.decision_center import ZoneStatus
+from app.services.multi_timeframe_bias import MultiTimeframeBiasService
 from app.smart_money.service import SmartMoneyService
 
 
@@ -71,6 +72,7 @@ class DecisionCenter:
             risk_level=risk_level,
             confluences=confluences,
         )
+        multi_timeframe_bias = MultiTimeframeBiasService.build_report(decision.symbol)
         narrative = DecisionCenter._narrative(
             decision=decision,
             market_bias=market_bias,
@@ -109,6 +111,7 @@ class DecisionCenter:
             execution_checklist=checklist,
             final_recommendation=recommendation,
             narrative=narrative,
+            multi_timeframe_bias=multi_timeframe_bias,
         )
 
     @staticmethod

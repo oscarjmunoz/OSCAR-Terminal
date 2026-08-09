@@ -5,6 +5,7 @@ import Dashboard from "./Dashboard";
 
 import { getAnalyticsPerformance } from "../api/analytics";
 import { getLiveDecisionReport } from "../api/decision";
+import { executeDecisionBridge } from "../api/decisionExecution";
 import { getOperationalReadiness } from "../api/health";
 import { getJournalEntries } from "../api/journal";
 import { getStatus, getTick } from "../api/market";
@@ -17,6 +18,10 @@ vi.mock("../api/system", () => ({
 
 vi.mock("../api/decision", () => ({
     getLiveDecisionReport: vi.fn(),
+}));
+
+vi.mock("../api/decisionExecution", () => ({
+    executeDecisionBridge: vi.fn(),
 }));
 
 vi.mock("../api/market", () => ({
@@ -101,6 +106,15 @@ const liveDecisionReport = {
         explanation: "Context is bearish, but execution still requires confirmation.",
     },
     narrative: "Live bearish context with partial confluence. Decision remains with the trader.",
+    multi_timeframe_bias: {
+        h4: { timeframe: "H4", bias: "BULLISH", bos: false, choch: false, mss: false, structure_confidence: "HIGH", data_availability: "AVAILABLE", explanation: "Higher timeframe structure remains bullish." },
+        h1: { timeframe: "H1", bias: "BULLISH", bos: false, choch: false, mss: false, structure_confidence: "HIGH", data_availability: "AVAILABLE", explanation: "Higher timeframe structure remains bullish." },
+        m5: { timeframe: "M5", bias: "BEARISH", bos: true, choch: false, mss: true, structure_confidence: "HIGH", data_availability: "AVAILABLE", explanation: "Local structure is bearish." },
+        alignment: "MIXED",
+        conflict: false,
+        confidence: "MEDIUM",
+        summary: "Higher timeframe context is mixed with the local structure.",
+    },
 };
 
 const journalEntry = {
@@ -169,6 +183,92 @@ const readiness = {
     ],
 };
 
+const decisionExecutionBridge = {
+    decision: {
+        source: "REPORT",
+        report: liveDecisionReport,
+    },
+    playbookResult: {
+        totalPlaybooks: 1,
+        matches: [],
+        matchedPlaybooks: [],
+        bestMatch: {
+            setupId: "setup-1",
+            setupName: "London Breakout",
+            matched: true,
+            matchPercentage: 75,
+            matchedConditions: ["Bias == BEARISH"],
+            missingConditions: ["Liquidity sweep"],
+            explanation: "London Breakout: matched 75% - missing Liquidity sweep",
+        },
+        bestMatchScore: 75,
+        requirementsSatisfied: true,
+        permitsContinuation: true,
+        reasons: [],
+    },
+    executionPreparation: {
+        request: {
+            symbol: "EURUSD",
+            side: "SELL",
+            entry_price: 1.089,
+            stop_loss: 1.092,
+            take_profit: 1.084,
+            risk_percent: 0.45,
+            account_balance: null,
+            spread: null,
+            pip_value: null,
+            tick_value: null,
+            leverage: null,
+            contract_size: null,
+            min_rr: 2,
+            max_risk_percent: 2,
+            max_spread: 2.5,
+            min_lot: 0.01,
+            max_lot: 100,
+            margin_buffer: 0.7,
+        },
+        result: {
+            symbol: "EURUSD",
+            side: "SELL",
+            entry: 1.089,
+            stop_loss: 1.092,
+            take_profit: 1.084,
+            lot_size: 0.1,
+            risk_percent: 0.45,
+            risk_money: 45,
+            reward_money: 90,
+            risk_pips: 30,
+            reward_pips: 60,
+            rr: 2,
+            pip_value: 10,
+            tick_value: 1,
+            margin_required: 120,
+            spread: 2,
+            validation_results: [],
+            institutional_score: 78,
+            execution_status: "READY",
+        },
+        missingRequiredFields: [],
+        validationFailures: [],
+        validationWarnings: [],
+    },
+    safetyGate: {
+        dispatchRequested: false,
+        dispatchEnabled: false,
+        passed: true,
+        action: "PREPARE",
+        reasons: [],
+    },
+    executionBoundary: {
+        attempted: false,
+        status: "NOT_REQUESTED",
+        tradeResult: null,
+        journalEntry: null,
+    },
+    finalAction: "PREPARE",
+    finalStatus: "READY_FOR_REVIEW",
+};
+
 beforeEach(() => {
     window.localStorage.clear();
 
@@ -195,6 +295,7 @@ beforeEach(() => {
 
     vi.mocked(getOperationalReadiness).mockResolvedValue(readiness);
     vi.mocked(getLiveDecisionReport).mockResolvedValue(liveDecisionReport);
+    vi.mocked(executeDecisionBridge).mockResolvedValue(decisionExecutionBridge as never);
     vi.mocked(getJournalEntries).mockResolvedValue([journalEntry]);
     vi.mocked(getPlaybookSetups).mockResolvedValue([
         {
@@ -242,11 +343,12 @@ describe("Dashboard", () => {
         render(<Dashboard />);
 
         const decisionPanel = await screen.findByTestId("decision-center");
-        expect(within(decisionPanel).getByText("WAIT")).toBeInTheDocument();
+        expect(within(decisionPanel).getAllByText("WAIT").length).toBeGreaterThan(0);
         expect(within(decisionPanel).getByText("68.40%")).toBeInTheDocument();
 
         expect(screen.getByTestId("trading-bar")).toBeInTheDocument();
         expect(screen.getByTestId("market-snapshot")).toHaveTextContent("Institutional Score");
+        expect(screen.getByTestId("multitimeframe-panel")).toHaveTextContent("Multi-Timeframe Bias");
         expect(screen.getByTestId("playbook-panel")).toHaveTextContent("London Breakout");
         expect(screen.getByTestId("performance-panel")).toHaveTextContent("Profit Factor");
         expect(screen.getByTestId("risk-panel")).toHaveTextContent("Expected RR");
@@ -276,6 +378,18 @@ describe("Dashboard", () => {
         });
     });
 
+    it("uses backend decision report for decision execution bridge without frontend-side decision calculation", async () => {
+        render(<Dashboard />);
+
+        await screen.findByTestId("decision-execution-panel");
+
+        expect(executeDecisionBridge).toHaveBeenCalledWith({
+            decisionReport: liveDecisionReport,
+            dispatch: false,
+            timeframe: "M5",
+        });
+    });
+
     it("activates focus mode and hides non-essential zones", async () => {
         render(<Dashboard />);
 
@@ -297,12 +411,16 @@ describe("Dashboard", () => {
         render(<Dashboard />);
 
         await screen.findByTestId("favorites-panel");
-        const starToggle = screen.getByLabelText("Toggle GBPUSD favorite");
+        const starToggle = screen.getByLabelText("Toggle EURUSD favorite");
         fireEvent.click(starToggle);
 
-        const raw = window.localStorage.getItem("oscar.favoriteSymbols.v1");
-        expect(raw).not.toBeNull();
-        expect(raw).toContain("GBPUSD");
+        await waitFor(() => {
+            const raw = window.localStorage.getItem("oscar.favoriteSymbols.v1");
+            expect(raw).not.toBeNull();
+            expect(raw).toContain("GBPUSD");
+            expect(raw).toContain("USDJPY");
+            expect(raw).not.toContain("EURUSD");
+        });
     });
 
     it("shows graceful empty states for optional history", async () => {

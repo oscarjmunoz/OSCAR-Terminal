@@ -8,23 +8,26 @@ export interface PerformanceReport {
     cancelled: number;
     winRate: number;
     averageRR: number;
-    netRR: number;
-    averageDuration: number;
+    averageProfit: number;
+    averageLoss: number;
+    expectancy: number;
+    profitFactor: number;
 }
 
 export interface SessionAnalytics {
     session: string;
-    totalTrades: number;
+    trades: number;
     winRate: number;
     averageRR: number;
+    averageDuration: number;
 }
 
 export interface BehaviourAnalytics {
-    behaviour: string;
-    totalTrades: number;
+    recommendation: string;
+    trades: number;
     winRate: number;
     averageRR: number;
-    netRR: number;
+    profitFactor: number;
 }
 
 export interface SetupAnalytics {
@@ -33,7 +36,7 @@ export interface SetupAnalytics {
     totalTrades: number;
     winRate: number;
     averageRR: number;
-    averageMatchPercentage: number;
+    expectancy: number;
 }
 
 export async function getAnalyticsPerformance(): Promise<PerformanceReport> {

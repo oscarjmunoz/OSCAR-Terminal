@@ -11,6 +11,7 @@ from app.schemas.decision_center import DecisionReport
 from app.schemas.decision_center import FinalRecommendation
 from app.schemas.decision_center import RiskAssessmentReport
 from app.services.decision_center import DecisionCenter
+from app.services.multi_timeframe_bias import MultiTimeframeBiasService
 from app.smart_money.service import SmartMoneyService
 
 
@@ -95,6 +96,12 @@ class OperationalAnalysisService:
             risk_level=risk_level,
             confluences=confluences,
         )
+        multi_timeframe_bias = MultiTimeframeBiasService.build_report(
+            request.symbol,
+            m5_candles=candles,
+            m5_structure=structure,
+            include_higher_timeframes=False,
+        )
         narrative = DecisionCenter._narrative(
             decision=decision,
             market_bias=market_bias,
@@ -133,6 +140,7 @@ class OperationalAnalysisService:
             execution_checklist=checklist,
             final_recommendation=recommendation,
             narrative=narrative,
+            multi_timeframe_bias=multi_timeframe_bias,
         )
 
     @staticmethod

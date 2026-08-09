@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { getAnalyticsPerformance, PerformanceReport } from "../api/analytics";
 import { getLiveDecisionReport, LiveDecisionReport } from "../api/decision";
+import { DecisionExecutionBridgeResult, executeDecisionBridge } from "../api/decisionExecution";
 import { getOperationalReadiness, OperationalReadinessResponse } from "../api/health";
 import { getJournalEntries, JournalEntry } from "../api/journal";
 import { getStatus, getTick, TerminalStatus, TickResponse } from "../api/market";
@@ -13,6 +14,7 @@ import EmptyState from "../components/dashboard/EmptyState";
 import MetricCard from "../components/dashboard/MetricCard";
 import Panel from "../components/dashboard/Panel";
 import SelectorField from "../components/dashboard/SelectorField";
+import TradeTicket from "../components/execution/TradeTicket";
 
 type DashboardState = {
     marketStatus: TerminalStatus | null;
@@ -122,6 +124,26 @@ function explainAnalysisError(error: unknown): string {
     return "No fue posible actualizar el contexto en vivo.";
 }
 
+function explainBridgeError(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+        const detail = error.response?.data?.detail;
+
+        if (typeof detail === "string") {
+            return detail;
+        }
+
+        if (detail && typeof detail === "object" && typeof detail.message === "string") {
+            return detail.message;
+        }
+
+        if (error.code === "ECONNABORTED") {
+            return "Decision execution bridge timed out. Try again in a few seconds.";
+        }
+    }
+
+    return "Decision execution bridge is unavailable right now.";
+}
+
 function getInitialFavorites(symbols: string[]): string[] {
     if (typeof window === "undefined") {
         return symbols.slice(0, 3);
@@ -201,6 +223,8 @@ export default function Dashboard() {
     const [selectedTimeframe, setSelectedTimeframe] = useState(fallbackSettings.defaultTimeframe);
     const [decisionReport, setDecisionReport] = useState<LiveDecisionReport | null>(null);
     const [playbookMatches, setPlaybookMatches] = useState<PlaybookMatch[]>([]);
+    const [decisionExecution, setDecisionExecution] = useState<DecisionExecutionBridgeResult | null>(null);
+    const [decisionExecutionError, setDecisionExecutionError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisProgress, setAnalysisProgress] = useState("Preparando workspace institucional.");
@@ -257,15 +281,21 @@ export default function Dashboard() {
             }
 
             setAnalysisProgress("Contrastando setup actual con Playbook.");
-            const playbookMatchResult = await Promise.allSettled([
+            const [playbookMatchResult, executionBridgeResult] = await Promise.allSettled([
                 evaluatePlaybookMatches(liveDecision),
+                executeDecisionBridge({
+                    decisionReport: liveDecision,
+                    dispatch: false,
+                    timeframe,
+                }),
             ]);
 
             if (analysisRequestRef.current !== requestId) {
                 return;
             }
 
-            const playbookMatchList = settledValue(playbookMatchResult[0]) ?? [];
+            const playbookMatchList = settledValue(playbookMatchResult) ?? [];
+            const bridgeResult = settledValue(executionBridgeResult);
 
             setState((previous) => ({
                 ...previous,
@@ -276,8 +306,18 @@ export default function Dashboard() {
 
             setDecisionReport(liveDecision);
             setPlaybookMatches([...playbookMatchList].sort((left, right) => right.matchPercentage - left.matchPercentage));
+            setDecisionExecution(bridgeResult);
+            setDecisionExecutionError(
+                executionBridgeResult.status === "rejected"
+                    ? explainBridgeError(executionBridgeResult.reason)
+                    : null
+            );
             setLastAnalyzedAt(new Date());
-            setAnalysisProgress("Workspace listo para decidir.");
+            setAnalysisProgress(
+                bridgeResult
+                    ? "Workspace listo para decidir con execution bridge validado."
+                    : "Workspace listo para decidir. Execution bridge temporalmente no disponible."
+            );
         }
         catch (error) {
             if (analysisRequestRef.current !== requestId) {
@@ -286,6 +326,8 @@ export default function Dashboard() {
 
             setDecisionReport(null);
             setPlaybookMatches([]);
+            setDecisionExecution(null);
+            setDecisionExecutionError(null);
             setAnalysisError(explainAnalysisError(error));
             setAnalysisProgress("Sin actualizacion de contexto.");
         }
@@ -516,39 +558,79 @@ export default function Dashboard() {
                                 subtitle="Panorama institucional instantaneo para validar contexto antes de ejecutar."
                             >
                                 {decisionReport ? (
-                                    <div className="metric-grid metric-grid--three">
-                                        <MetricCard
-                                            label="Bias"
-                                            value={decisionReport.market_bias.bias}
-                                            detail={decisionReport.market_bias.explanation}
-                                            tone={toneFromStatus(decisionReport.market_bias.bias)}
-                                        />
-                                        <MetricCard
-                                            label="Structure"
-                                            value={decisionReport.market_structure.trend}
-                                            detail={`BOS ${decisionReport.market_structure.bos ? "YES" : "NO"} · CHOCH ${decisionReport.market_structure.choch ? "YES" : "NO"} · MSS ${decisionReport.market_structure.mss ? "YES" : "NO"}`}
-                                            tone={toneFromStatus(decisionReport.market_structure.trend)}
-                                        />
-                                        <MetricCard
-                                            label="Liquidity"
-                                            value={`Taken ${decisionReport.liquidity.liquidity_taken}`}
-                                            detail={`Pending ${decisionReport.liquidity.pending_liquidity} · Buy ${decisionReport.liquidity.buy_liquidity} · Sell ${decisionReport.liquidity.sell_liquidity}`}
-                                            tone={decisionReport.liquidity.liquidity_taken > 0 ? "positive" : "warning"}
-                                        />
-                                        <MetricCard label="Session" value={currentSession} detail="Sesion operativa mas reciente." tone="neutral" />
-                                        <MetricCard
-                                            label="Premium / Discount"
-                                            value={decisionReport.institutional_zones.premium.active ? "PREMIUM" : decisionReport.institutional_zones.discount.active ? "DISCOUNT" : "NEUTRAL"}
-                                            detail={decisionReport.institutional_zones.premium.active ? decisionReport.institutional_zones.premium.explanation : decisionReport.institutional_zones.discount.explanation}
-                                            tone={decisionReport.institutional_zones.premium.active || decisionReport.institutional_zones.discount.active ? "positive" : "neutral"}
-                                        />
-                                        <MetricCard
-                                            label="Institutional Score"
-                                            value={String(decisionReport.institutional_score.score)}
-                                            detail={`Confidence ${percentOrDash(decisionReport.institutional_score.confidence)}`}
-                                            tone={decisionReport.institutional_score.score >= 70 ? "positive" : decisionReport.institutional_score.score >= 50 ? "warning" : "danger"}
-                                        />
-                                    </div>
+                                    <>
+                                        <div className="metric-grid metric-grid--three">
+                                            <MetricCard
+                                                label="Bias"
+                                                value={decisionReport.market_bias.bias}
+                                                detail={decisionReport.market_bias.explanation}
+                                                tone={toneFromStatus(decisionReport.market_bias.bias)}
+                                            />
+                                            <MetricCard
+                                                label="Structure"
+                                                value={decisionReport.market_structure.trend}
+                                                detail={`BOS ${decisionReport.market_structure.bos ? "YES" : "NO"} · CHOCH ${decisionReport.market_structure.choch ? "YES" : "NO"} · MSS ${decisionReport.market_structure.mss ? "YES" : "NO"}`}
+                                                tone={toneFromStatus(decisionReport.market_structure.trend)}
+                                            />
+                                            <MetricCard
+                                                label="Liquidity"
+                                                value={`Taken ${decisionReport.liquidity.liquidity_taken}`}
+                                                detail={`Pending ${decisionReport.liquidity.pending_liquidity} · Buy ${decisionReport.liquidity.buy_liquidity} · Sell ${decisionReport.liquidity.sell_liquidity}`}
+                                                tone={decisionReport.liquidity.liquidity_taken > 0 ? "positive" : "warning"}
+                                            />
+                                            <MetricCard label="Session" value={currentSession} detail="Sesion operativa mas reciente." tone="neutral" />
+                                            <MetricCard
+                                                label="Premium / Discount"
+                                                value={decisionReport.institutional_zones.premium.active ? "PREMIUM" : decisionReport.institutional_zones.discount.active ? "DISCOUNT" : "NEUTRAL"}
+                                                detail={decisionReport.institutional_zones.premium.active ? decisionReport.institutional_zones.premium.explanation : decisionReport.institutional_zones.discount.explanation}
+                                                tone={decisionReport.institutional_zones.premium.active || decisionReport.institutional_zones.discount.active ? "positive" : "neutral"}
+                                            />
+                                            <MetricCard
+                                                label="Institutional Score"
+                                                value={String(decisionReport.institutional_score.score)}
+                                                detail={`Confidence ${percentOrDash(decisionReport.institutional_score.confidence)}`}
+                                                tone={decisionReport.institutional_score.score >= 70 ? "positive" : decisionReport.institutional_score.score >= 50 ? "warning" : "danger"}
+                                            />
+                                        </div>
+
+                                        {decisionReport.multi_timeframe_bias ? (
+                                            <div className="decision-block" data-testid="multitimeframe-panel">
+                                                <h3 className="decision-block__title">Multi-Timeframe Bias</h3>
+                                                <div className="metric-grid metric-grid--three">
+                                                    <MetricCard
+                                                        label="H4"
+                                                        value={decisionReport.multi_timeframe_bias.h4.bias}
+                                                        detail={decisionReport.multi_timeframe_bias.h4.explanation}
+                                                        tone="neutral"
+                                                    />
+                                                    <MetricCard
+                                                        label="H1"
+                                                        value={decisionReport.multi_timeframe_bias.h1.bias}
+                                                        detail={decisionReport.multi_timeframe_bias.h1.explanation}
+                                                        tone="neutral"
+                                                    />
+                                                    <MetricCard
+                                                        label="M5"
+                                                        value={decisionReport.multi_timeframe_bias.m5.bias}
+                                                        detail={decisionReport.multi_timeframe_bias.m5.explanation}
+                                                        tone="neutral"
+                                                    />
+                                                    <MetricCard
+                                                        label="Alignment"
+                                                        value={decisionReport.multi_timeframe_bias.alignment}
+                                                        detail={decisionReport.multi_timeframe_bias.summary}
+                                                        tone={decisionReport.multi_timeframe_bias.conflict ? "warning" : "positive"}
+                                                    />
+                                                    <MetricCard
+                                                        label="Conflict"
+                                                        value={decisionReport.multi_timeframe_bias.conflict ? "YES" : "NO"}
+                                                        detail={`Confidence ${decisionReport.multi_timeframe_bias.confidence}`}
+                                                        tone={decisionReport.multi_timeframe_bias.conflict ? "warning" : "neutral"}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : null}
+                                    </>
                                 ) : (
                                     <EmptyState
                                         title="Esperando claridad"
@@ -645,6 +727,14 @@ export default function Dashboard() {
                                                 />
                                             </div>
                                         </section>
+                                    </div>
+
+                                    <div data-testid="decision-execution-panel">
+                                        <TradeTicket
+                                            ticket={decisionExecution?.executionPreparation.result ?? null}
+                                            bridge={decisionExecution}
+                                            bridgeError={decisionExecutionError}
+                                        />
                                     </div>
                                 </>
                             ) : (

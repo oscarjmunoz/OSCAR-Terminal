@@ -52,6 +52,8 @@ El Decision Center no automatiza trading y no envia ordenes.
 
 El Journal consume un `DecisionReport` ya generado y lo persiste en memoria sin recalcular analisis institucional ni depender de una base de datos.
 
+HD-016B: el estado de paper positions es session-scoped in memory. No se agrega persistencia durable ni cambios de esquema en esta fase.
+
 Flujo:
 
 1. El usuario recibe un `DecisionReport` desde `DecisionCenter`.
@@ -140,6 +142,8 @@ Endpoints:
 - `GET /api/v1/health`
 
 - `POST /api/v1/decision/report`
+- `POST /api/v1/paper/positions/{position_id}/update`
+- `POST /api/v1/paper/positions/{position_id}/close`
 - `POST /api/v1/journal`
 - `GET /api/v1/journal`
 - `GET /api/v1/journal/{id}`

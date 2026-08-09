@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     defaultTimeframe: str = "M5"
     availableSymbols: str = "EURUSD,GBPUSD,USDJPY,XAUUSD,NAS100,US30,USDCHF"
 
+    DECISION_EXECUTION_DISPATCH_ENABLED: bool = False
+    DECISION_EXECUTION_MIN_RR: float = 2.0
+    DECISION_EXECUTION_MIN_INSTITUTIONAL_SCORE: int = 70
+
     DATABASE_URL: str = f"sqlite:///{DATABASE_PATH.as_posix()}"
 
 

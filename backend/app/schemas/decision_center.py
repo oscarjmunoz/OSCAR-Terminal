@@ -99,6 +99,62 @@ class FinalRecommendation(BaseModel):
     explanation: str
 
 
+class MultiTimeframeBiasState(str, Enum):
+    BULLISH = "BULLISH"
+    BEARISH = "BEARISH"
+    NEUTRAL = "NEUTRAL"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class MultiTimeframeDataAvailability(str, Enum):
+    AVAILABLE = "AVAILABLE"
+    DEGRADED = "DEGRADED"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class MultiTimeframeStructureConfidence(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class MultiTimeframeContextConfidence(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class MultiTimeframeAlignment(str, Enum):
+    ALIGNED_BULLISH = "ALIGNED_BULLISH"
+    ALIGNED_BEARISH = "ALIGNED_BEARISH"
+    MIXED = "MIXED"
+    CONFLICT = "CONFLICT"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class MultiTimeframeBiasItem(BaseModel):
+    timeframe: str
+    bias: MultiTimeframeBiasState
+    bos: bool
+    choch: bool
+    mss: bool
+    structure_confidence: MultiTimeframeStructureConfidence
+    data_availability: MultiTimeframeDataAvailability
+    explanation: str
+
+
+class MultiTimeframeBiasReport(BaseModel):
+    h4: MultiTimeframeBiasItem
+    h1: MultiTimeframeBiasItem
+    m5: MultiTimeframeBiasItem
+    alignment: MultiTimeframeAlignment
+    conflict: bool
+    confidence: MultiTimeframeContextConfidence
+    summary: str
+
+
 class DecisionReport(BaseModel):
     context: DecisionContext
     market_bias: MarketBiasReport
@@ -111,3 +167,4 @@ class DecisionReport(BaseModel):
     execution_checklist: list[ChecklistItem]
     final_recommendation: FinalRecommendation
     narrative: str
+    multi_timeframe_bias: MultiTimeframeBiasReport | None = None

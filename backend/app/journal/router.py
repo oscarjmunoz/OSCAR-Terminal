@@ -8,12 +8,13 @@ from app.journal.models import JournalFilterCriteria
 from app.journal.models import JournalOutcomeUpdate
 from app.journal.models import TradeOutcome
 from app.journal.models import TraderDecision
+from app.journal.repository import SqlAlchemyJournalRepository
 from app.journal.service import JournalNotFoundError
 from app.journal.service import JournalService
 
 router = APIRouter(prefix="/journal", tags=["Journal"])
 
-_journal_service = JournalService()
+_journal_service = JournalService(repository=SqlAlchemyJournalRepository())
 
 
 def get_journal_service() -> JournalService:

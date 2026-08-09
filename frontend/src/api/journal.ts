@@ -1,55 +1,11 @@
 import { api } from "./client";
+import type { DecisionChecklistItem, DecisionConfluence, DecisionSnapshot } from "./contracts";
 
-export interface DecisionChecklistItem {
-    label: string;
-    checked: boolean;
-    explanation: string;
-}
+export type { DecisionChecklistItem, DecisionConfluence, DecisionSnapshot } from "./contracts";
 
-export interface DecisionConfluenceItem {
-    name: string;
-    detected: boolean;
-    importance: string;
-    explanation: string;
-}
+export interface DecisionConfluenceItem extends DecisionConfluence { }
 
-export interface DecisionSnapshot {
-    bias: {
-        bias: string;
-        explanation: string;
-    };
-    score: number;
-    confidence: number;
-    liquidity: {
-        buy_liquidity: number;
-        sell_liquidity: number;
-        liquidity_taken: number;
-        pending_liquidity: number;
-        explanation: string;
-    };
-    structure: {
-        trend: string;
-        bos: boolean;
-        choch: boolean;
-        mss: boolean;
-        explanation: string;
-    };
-    zones: {
-        order_block: { active: boolean; explanation: string };
-        breaker: { active: boolean; explanation: string };
-        mitigation: { active: boolean; explanation: string };
-        fvg: { active: boolean; explanation: string };
-        premium: { active: boolean; explanation: string };
-        discount: { active: boolean; explanation: string };
-    };
-    confluences: DecisionConfluenceItem[];
-    checklist: DecisionChecklistItem[];
-    recommendation: {
-        recommendation: string;
-        explanation: string;
-    };
-    narrative: string;
-}
+export interface DecisionSnapshotView extends DecisionSnapshot { }
 
 export interface JournalEntry {
     id: string;
@@ -63,7 +19,7 @@ export interface JournalEntry {
     positionSize: number;
     riskPercent: number;
     expectedRR: number;
-    decisionSnapshot: DecisionSnapshot;
+    decisionSnapshot: DecisionSnapshotView;
     traderDecision: string;
     tradeOutcome: string;
     profitLoss?: number | null;

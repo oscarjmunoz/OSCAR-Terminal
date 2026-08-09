@@ -1,30 +1,9 @@
 import { api } from "./client";
+import type { DecisionChecklistItem, DecisionConfluence, DecisionContext, DecisionMultiTimeframeBias, DecisionSnapshot } from "./contracts";
 
-export interface DecisionContext {
-    symbol: string;
-    side: "BUY" | "SELL";
-    volume: number;
-    sl: number | null;
-    tp: number | null;
-    comment: string | null;
-    ticket?: number | null;
-    price?: number | null;
-}
+export type { DecisionChecklistItem, DecisionConfluence, DecisionContext, DecisionMultiTimeframeBias, DecisionSnapshot } from "./contracts";
 
-export interface DecisionChecklistItem {
-    label: string;
-    checked: boolean;
-    explanation: string;
-}
-
-export interface DecisionConfluence {
-    name: string;
-    detected: boolean;
-    importance: "HIGH" | "MEDIUM" | "LOW";
-    explanation: string;
-}
-
-export interface LiveDecisionReport {
+export interface LiveDecisionReport extends DecisionSnapshot {
     context: DecisionContext;
     market_bias: {
         bias: string;
@@ -71,6 +50,7 @@ export interface LiveDecisionReport {
         explanation: string;
     };
     narrative: string;
+    multi_timeframe_bias?: DecisionMultiTimeframeBias;
 }
 
 export async function getLiveDecisionReport(symbol: string, timeframe: string): Promise<LiveDecisionReport> {
