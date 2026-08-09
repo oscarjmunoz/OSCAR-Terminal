@@ -251,6 +251,8 @@ export default function Dashboard() {
     const [playbookMatches, setPlaybookMatches] = useState<PlaybookMatch[]>([]);
     const [decisionExecution, setDecisionExecution] = useState<DecisionExecutionBridgeResult | null>(null);
     const [decisionExecutionError, setDecisionExecutionError] = useState<string | null>(null);
+    const [paperExecutionError, setPaperExecutionError] = useState<string | null>(null);
+    const [isConfirmingPaper, setIsConfirmingPaper] = useState(false);
     const [selectedOpportunity, setSelectedOpportunity] = useState<OpportunityResult | null>(null);
     const [opportunityQueueError, setOpportunityQueueError] = useState<string | null>(null);
     const [opportunityQueueLoading, setOpportunityQueueLoading] = useState(true);
@@ -308,6 +310,8 @@ export default function Dashboard() {
 
         setIsAnalyzing(true);
         setAnalysisError(null);
+        setPaperExecutionError(null);
+        setIsConfirmingPaper(false);
         setAnalysisProgress(`Analizando ${symbol} ${timeframe}.`);
 
         try {
@@ -395,6 +399,8 @@ export default function Dashboard() {
     function inspectOpportunity(opportunity: OpportunityResult) {
         const key = `${opportunity.symbol}:${opportunity.timeframe}`;
         setSelectedOpportunity(opportunity);
+        setPaperExecutionError(null);
+        setIsConfirmingPaper(false);
         setSelectedSymbol(opportunity.symbol);
         setSelectedTimeframe(opportunity.timeframe);
         setAnalysisProgress(`Inspecting ${key} from the opportunity queue.`);
@@ -494,6 +500,71 @@ export default function Dashboard() {
 
             return [...previous, symbol];
         });
+    }
+
+    function normalizeRecommendation(value: string | null | undefined): string {
+        return (value ?? "").trim().toUpperCase().replace(/\s+/g, "_");
+    }
+
+    const recommendation = normalizeRecommendation(decisionReport?.final_recommendation.recommendation);
+    const isWaitRecommendation = recommendation === "WAIT";
+    const isNoTradeRecommendation = recommendation === "NO_TRADE";
+    const blockedByRecommendation = isWaitRecommendation || isNoTradeRecommendation;
+    const blockedBySafety = Boolean(decisionExecution && !decisionExecution.safetyGate.passed);
+    const hasPreparedTicket = Boolean(decisionExecution?.executionPreparation.result);
+    const canConfirmPaperTrade = Boolean(
+        decisionReport
+        && hasPreparedTicket
+        && !blockedByRecommendation
+        && !blockedBySafety
+        && !isAnalyzing
+        && !isConfirmingPaper
+    );
+
+    const confirmPaperDisabledReason = !decisionReport
+        ? "Load a decision first."
+        : !hasPreparedTicket
+            ? "Execution preparation is unavailable."
+            : isWaitRecommendation
+                ? "WAIT decisions cannot be confirmed for paper execution."
+                : isNoTradeRecommendation
+                    ? "NO_TRADE decisions cannot be confirmed for paper execution."
+                    : blockedBySafety
+                        ? "Safety gate rejected execution for this decision."
+                        : isAnalyzing
+                            ? "Wait until analysis completes."
+                            : isConfirmingPaper
+                                ? "Submitting paper execution request..."
+                                : null;
+
+    async function confirmPaperTrade() {
+        if (!decisionReport || !canConfirmPaperTrade) {
+            return;
+        }
+
+        setPaperExecutionError(null);
+        setDecisionExecutionError(null);
+        setIsConfirmingPaper(true);
+
+        try {
+            const response = await executeDecisionBridge({
+                decisionReport,
+                executionMode: "PAPER",
+                confirmed: true,
+                timeframe: selectedTimeframe,
+            });
+
+            setDecisionExecution(response);
+            setAnalysisProgress("Paper trade confirmed and sent to backend paper execution.");
+        }
+        catch (error) {
+            const explained = explainBridgeError(error);
+            setPaperExecutionError(explained);
+            setAnalysisProgress("Paper confirmation failed.");
+        }
+        finally {
+            setIsConfirmingPaper(false);
+        }
     }
 
     if (loading) {
@@ -824,7 +895,13 @@ export default function Dashboard() {
                                         <TradeTicket
                                             ticket={decisionExecution?.executionPreparation.result ?? null}
                                             bridge={decisionExecution}
-                                            bridgeError={decisionExecutionError}
+                                            bridgeError={paperExecutionError ?? decisionExecutionError}
+                                            canConfirmPaperTrade={canConfirmPaperTrade}
+                                            confirmPaperDisabledReason={confirmPaperDisabledReason}
+                                            isConfirmingPaper={isConfirmingPaper}
+                                            onConfirmPaperTrade={() => {
+                                                void confirmPaperTrade();
+                                            }}
                                         />
                                     </div>
                                 </>

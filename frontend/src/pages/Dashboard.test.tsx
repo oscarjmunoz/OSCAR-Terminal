@@ -324,6 +324,56 @@ const decisionExecutionBridge = {
     finalStatus: "READY_FOR_REVIEW",
 };
 
+const paperExecutionBridge = {
+    ...decisionExecutionBridge,
+    executionBoundary: {
+        attempted: true,
+        status: "SUCCESS",
+        tradeResult: null,
+        journalEntry: null,
+        paperExecution: {
+            order: {
+                order_id: "paper-order-1",
+                symbol: "EURUSD",
+                side: "SELL",
+                requested_volume: 0.1,
+                entry_price: 1.089,
+                stop_loss: 1.092,
+                take_profit: 1.084,
+                status: "FILLED",
+                created_at: "2026-08-09T09:30:00Z",
+                filled_at: "2026-08-09T09:30:01Z",
+                decision_reference_id: "decision-1",
+            },
+            position: {
+                position_id: "paper-position-1",
+                symbol: "EURUSD",
+                side: "SELL",
+                volume: 0.1,
+                entry_price: 1.089,
+                stop_loss: 1.092,
+                take_profit: 1.084,
+                status: "OPEN",
+                opened_at: "2026-08-09T09:30:01Z",
+                updated_at: "2026-08-09T09:30:01Z",
+                originating_order_id: "paper-order-1",
+                close_price: null,
+                closed_at: null,
+                realized_pnl: null,
+                realized_rr: null,
+                last_mark_price: null,
+                last_marked_at: null,
+                unrealized_pnl: null,
+                journal_entry_id: null,
+            },
+            deterministic_fill_price: 1.089,
+            order_status_flow: ["PREPARED", "SUBMITTED", "FILLED"],
+        },
+    },
+    finalAction: "DISPATCH",
+    finalStatus: "DISPATCHED",
+};
+
 beforeEach(() => {
     window.localStorage.clear();
 
@@ -448,6 +498,16 @@ describe("Dashboard", () => {
         });
     });
 
+    it("keeps confirmed absent before explicit user confirmation", async () => {
+        render(<Dashboard />);
+
+        await screen.findByTestId("decision-execution-panel");
+
+        const payloads = vi.mocked(executeDecisionBridge).mock.calls.map(([payload]) => payload);
+        expect(payloads.length).toBeGreaterThan(0);
+        expect(payloads.every((payload) => payload?.confirmed !== true)).toBe(true);
+    });
+
     it("inspects an opportunity without triggering paper execution or confirmation", async () => {
         render(<Dashboard />);
 
@@ -464,6 +524,115 @@ describe("Dashboard", () => {
             timeframe: "H1",
         }));
         expect(vi.mocked(executeDecisionBridge).mock.calls.every(([payload]) => payload?.confirmed !== true)).toBe(true);
+    });
+
+    it("does not execute when opening the trade ticket view", async () => {
+        render(<Dashboard />);
+
+        await screen.findByTestId("decision-execution-panel");
+        expect(screen.getByRole("button", { name: "CONFIRM PAPER TRADE" })).toBeDisabled();
+
+        const payloads = vi.mocked(executeDecisionBridge).mock.calls.map(([payload]) => payload);
+        expect(payloads.every((payload) => payload?.executionMode !== "PAPER")).toBe(true);
+        expect(payloads.every((payload) => payload?.confirmed !== true)).toBe(true);
+    });
+
+    it("sends explicit PAPER confirmation only after clicking CONFIRM PAPER TRADE", async () => {
+        const tradableDecision = {
+            ...liveDecisionReport,
+            final_recommendation: {
+                recommendation: "SELL",
+                explanation: "Tradable sell setup.",
+            },
+        };
+
+        vi.mocked(getLiveDecisionReport).mockResolvedValueOnce(tradableDecision as never);
+        vi.mocked(executeDecisionBridge)
+            .mockResolvedValueOnce({
+                ...decisionExecutionBridge,
+                decision: {
+                    ...decisionExecutionBridge.decision,
+                    report: tradableDecision,
+                },
+            } as never)
+            .mockResolvedValueOnce(paperExecutionBridge as never);
+
+        render(<Dashboard />);
+
+        const confirmButton = await screen.findByRole("button", { name: "CONFIRM PAPER TRADE" });
+        expect(confirmButton).toBeEnabled();
+
+        fireEvent.click(confirmButton);
+
+        await waitFor(() => {
+            expect(executeDecisionBridge).toHaveBeenCalledWith(expect.objectContaining({
+                executionMode: "PAPER",
+                confirmed: true,
+                timeframe: "M5",
+            }));
+        });
+
+        expect(screen.getByTestId("paper-execution-result")).toHaveTextContent("paper-position-1");
+    });
+
+    it("disables PAPER confirmation for WAIT decisions", async () => {
+        render(<Dashboard />);
+
+        const confirmButton = await screen.findByRole("button", { name: "CONFIRM PAPER TRADE" });
+        expect(confirmButton).toBeDisabled();
+        expect(screen.getByText("WAIT decisions cannot be confirmed for paper execution.")).toBeInTheDocument();
+    });
+
+    it("disables PAPER confirmation for NO_TRADE decisions", async () => {
+        const noTradeDecision = {
+            ...liveDecisionReport,
+            final_recommendation: {
+                recommendation: "NO_TRADE",
+                explanation: "No trade condition.",
+            },
+        };
+
+        vi.mocked(getLiveDecisionReport).mockResolvedValueOnce(noTradeDecision as never);
+
+        render(<Dashboard />);
+
+        const confirmButton = await screen.findByRole("button", { name: "CONFIRM PAPER TRADE" });
+        expect(confirmButton).toBeDisabled();
+        expect(screen.getByText("NO_TRADE decisions cannot be confirmed for paper execution.")).toBeInTheDocument();
+    });
+
+    it("paper confirmation never requests live execution mode", async () => {
+        const tradableDecision = {
+            ...liveDecisionReport,
+            final_recommendation: {
+                recommendation: "BUY",
+                explanation: "Tradable buy setup.",
+            },
+        };
+
+        vi.mocked(getLiveDecisionReport).mockResolvedValueOnce(tradableDecision as never);
+        vi.mocked(executeDecisionBridge)
+            .mockResolvedValueOnce({
+                ...decisionExecutionBridge,
+                decision: {
+                    ...decisionExecutionBridge.decision,
+                    report: tradableDecision,
+                },
+            } as never)
+            .mockResolvedValueOnce(paperExecutionBridge as never);
+
+        render(<Dashboard />);
+
+        const confirmButton = await screen.findByRole("button", { name: "CONFIRM PAPER TRADE" });
+        fireEvent.click(confirmButton);
+
+        await waitFor(() => {
+            const payloads = vi.mocked(executeDecisionBridge).mock.calls.map(([payload]) => payload);
+            expect(payloads.some((payload) => payload?.executionMode === "PAPER" && payload?.confirmed === true)).toBe(true);
+        });
+
+        const payloads = vi.mocked(executeDecisionBridge).mock.calls.map(([payload]) => payload);
+        expect(payloads.some((payload) => payload?.executionMode === "LIVE")).toBe(false);
     });
 
     it("activates focus mode and hides non-essential zones", async () => {

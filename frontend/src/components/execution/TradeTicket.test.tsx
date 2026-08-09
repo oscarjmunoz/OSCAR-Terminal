@@ -1,9 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 
 import TradeTicket from "./TradeTicket";
 
-function buildBridge(action: "PREPARE" | "REVIEW" | "BLOCK" | "DISPATCH") {
+function buildBridge(
+    action: "PREPARE" | "REVIEW" | "BLOCK" | "DISPATCH",
+    recommendation: string = action === "BLOCK" ? "NO_TRADE" : "WAIT"
+) {
     const dispatchStatusByAction = {
         PREPARE: "NOT_REQUESTED",
         REVIEW: "SKIPPED",
@@ -70,7 +73,7 @@ function buildBridge(action: "PREPARE" | "REVIEW" | "BLOCK" | "DISPATCH") {
                     { label: "Trend aligned", checked: true, explanation: "Bias and structure are aligned." },
                 ],
                 final_recommendation: {
-                    recommendation: action === "BLOCK" ? "NO TRADE" : "WAIT",
+                    recommendation,
                     explanation: "Backend decision recommendation.",
                 },
                 narrative: "Live bearish context.",
@@ -165,6 +168,44 @@ function buildBridge(action: "PREPARE" | "REVIEW" | "BLOCK" | "DISPATCH") {
             journalEntry: action === "DISPATCH" ? {
                 id: "journal-1",
             } : null,
+            paperExecution: action === "DISPATCH" ? {
+                order: {
+                    order_id: "paper-order-1",
+                    symbol: "EURUSD",
+                    side: "SELL",
+                    requested_volume: 0.1,
+                    entry_price: 1.089,
+                    stop_loss: 1.092,
+                    take_profit: 1.084,
+                    status: "FILLED",
+                    created_at: "2026-08-09T09:30:00Z",
+                    filled_at: "2026-08-09T09:30:01Z",
+                    decision_reference_id: "decision-1",
+                },
+                position: {
+                    position_id: "paper-position-1",
+                    symbol: "EURUSD",
+                    side: "SELL",
+                    volume: 0.1,
+                    entry_price: 1.089,
+                    stop_loss: 1.092,
+                    take_profit: 1.084,
+                    status: "OPEN",
+                    opened_at: "2026-08-09T09:30:01Z",
+                    updated_at: "2026-08-09T09:30:01Z",
+                    originating_order_id: "paper-order-1",
+                    close_price: null,
+                    closed_at: null,
+                    realized_pnl: null,
+                    realized_rr: null,
+                    last_mark_price: null,
+                    last_marked_at: null,
+                    unrealized_pnl: null,
+                    journal_entry_id: null,
+                },
+                deterministic_fill_price: 1.089,
+                order_status_flow: ["PREPARED", "SUBMITTED", "FILLED"],
+            } : null,
         },
         finalAction: action,
         finalStatus: action === "DISPATCH" ? "DISPATCHED" : action === "BLOCK" ? "BLOCKED" : "READY_FOR_REVIEW",
@@ -206,5 +247,42 @@ describe("TradeTicket", () => {
 
         expect(screen.getByText("Gate passed: NO · Dispatch requested: NO · Dispatch enabled: NO")).toBeInTheDocument();
         expect(screen.getByText("Recommendation is WAIT")).toBeInTheDocument();
+    });
+
+    it("keeps PAPER confirmation disabled for WAIT recommendation", () => {
+        render(
+            <TradeTicket
+                ticket={null}
+                bridge={buildBridge("PREPARE", "WAIT") as never}
+                canConfirmPaperTrade={false}
+                confirmPaperDisabledReason="WAIT decisions cannot be confirmed for paper execution."
+            />
+        );
+
+        expect(screen.getByRole("button", { name: "CONFIRM PAPER TRADE" })).toBeDisabled();
+        expect(screen.getByText("WAIT decisions cannot be confirmed for paper execution.")).toBeInTheDocument();
+    });
+
+    it("allows explicit PAPER confirmation when enabled", () => {
+        const onConfirm = vi.fn();
+
+        render(
+            <TradeTicket
+                ticket={null}
+                bridge={buildBridge("PREPARE", "SELL") as never}
+                canConfirmPaperTrade
+                onConfirmPaperTrade={onConfirm}
+            />
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "CONFIRM PAPER TRADE" }));
+        expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    it("renders paper execution identifiers after successful confirmation", () => {
+        render(<TradeTicket ticket={null} bridge={buildBridge("DISPATCH", "SELL") as never} />);
+
+        expect(screen.getByTestId("paper-execution-result")).toHaveTextContent("paper-order-1");
+        expect(screen.getByTestId("paper-execution-result")).toHaveTextContent("paper-position-1");
     });
 });

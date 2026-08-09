@@ -5,6 +5,10 @@ type TradeTicketProps = {
     ticket: ExecutionResult | null;
     bridge: DecisionExecutionBridgeResult | null;
     bridgeError?: string | null;
+    canConfirmPaperTrade?: boolean;
+    confirmPaperDisabledReason?: string | null;
+    isConfirmingPaper?: boolean;
+    onConfirmPaperTrade?: () => void;
 };
 
 function formatPrice(value: number): string {
@@ -75,7 +79,15 @@ function actionDescription(action: BridgeAction): string {
     return "DISPATCH reflects backend dispatch state when safety gate permits it.";
 }
 
-export default function TradeTicket({ ticket, bridge, bridgeError }: TradeTicketProps) {
+export default function TradeTicket({
+    ticket,
+    bridge,
+    bridgeError,
+    canConfirmPaperTrade = false,
+    confirmPaperDisabledReason = null,
+    isConfirmingPaper = false,
+    onConfirmPaperTrade,
+}: TradeTicketProps) {
     if (!ticket && !bridge) {
         return (
             <section className="panel" aria-label="Institutional Trade Ticket">
@@ -132,6 +144,7 @@ export default function TradeTicket({ ticket, bridge, bridgeError }: TradeTicket
     const dispatchStatus = bridge?.executionBoundary.status ?? "NOT_REQUESTED";
     const preparationResult = ticket ?? bridge?.executionPreparation.result ?? null;
     const bestMatch = bridge?.playbookResult.bestMatch ?? null;
+    const paperExecution = bridge?.executionBoundary.paperExecution ?? null;
 
     return (
         <section className="panel" aria-label="Institutional Trade Ticket">
@@ -210,6 +223,26 @@ export default function TradeTicket({ ticket, bridge, bridgeError }: TradeTicket
 
                 {preparationResult ? (
                     <>
+                        <div className="row-item" data-testid="paper-confirmation-row">
+                            <div className="row-item__top">
+                                <strong className="row-item__title">Human Confirmation</strong>
+                                <span className="status-chip">PAPER ONLY</span>
+                            </div>
+                            <p className="row-item__meta">Selecting opportunities, opening tickets, and generating decisions never executes a paper trade.</p>
+                            <button
+                                type="button"
+                                className="action-button"
+                                data-testid="confirm-paper-trade-button"
+                                onClick={onConfirmPaperTrade}
+                                disabled={!canConfirmPaperTrade || isConfirmingPaper}
+                            >
+                                {isConfirmingPaper ? "Submitting PAPER confirmation..." : "CONFIRM PAPER TRADE"}
+                            </button>
+                            {!canConfirmPaperTrade && confirmPaperDisabledReason ? (
+                                <p className="row-item__meta">{confirmPaperDisabledReason}</p>
+                            ) : null}
+                        </div>
+
                         <div className="row-item"><strong>Symbol</strong><span>{preparationResult.symbol}</span></div>
                         <div className="row-item"><strong>Side</strong><span>{preparationResult.side}</span></div>
                         <div className="row-item"><strong>Entry</strong><span>{formatPrice(preparationResult.entry)}</span></div>
@@ -224,6 +257,18 @@ export default function TradeTicket({ ticket, bridge, bridgeError }: TradeTicket
                         <div className="row-item"><strong>Margin</strong><span>{formatMoney(preparationResult.margin_required)}</span></div>
                         <div className="row-item"><strong>Institutional Score</strong><span>{formatNumber(preparationResult.institutional_score)}</span></div>
                         <div className="row-item"><strong>Execution Status</strong><span>{preparationResult.execution_status}</span></div>
+
+                        {paperExecution ? (
+                            <div className="row-item" data-testid="paper-execution-result">
+                                <div className="row-item__top">
+                                    <strong className="row-item__title">Paper Execution Result</strong>
+                                    <span className="status-chip status-chip--positive">{bridge?.executionBoundary.status ?? "SUCCESS"}</span>
+                                </div>
+                                <p className="row-item__meta">Order ID: {paperExecution.order.order_id} · Status: {paperExecution.order.status}</p>
+                                <p className="row-item__meta">Open Position ID: {paperExecution.position.position_id} · Status: {paperExecution.position.status}</p>
+                                <p className="row-item__meta">Symbol: {paperExecution.position.symbol} · Side: {paperExecution.position.side} · Volume: {formatNumber(paperExecution.position.volume)}</p>
+                            </div>
+                        ) : null}
                     </>
                 ) : (
                     <div className="row-item">
