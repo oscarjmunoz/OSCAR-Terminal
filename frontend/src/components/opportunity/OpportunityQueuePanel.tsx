@@ -34,8 +34,17 @@ function toneFromPriority(priority: OpportunityResult["priority"]): "positive" |
     return "neutral";
 }
 
-function toneFromHealth(health: string): "positive" | "warning" | "danger" | "neutral" {
+function normalizeHealth(health: string | null | undefined): string {
+    if (typeof health !== "string") {
+        return "N/A";
+    }
+
     const normalized = health.trim().toUpperCase();
+    return normalized || "N/A";
+}
+
+function toneFromHealth(health: string | null | undefined): "positive" | "warning" | "danger" | "neutral" {
+    const normalized = normalizeHealth(health);
 
     if (normalized === "GREEN") {
         return "positive";
@@ -164,6 +173,7 @@ export default function OpportunityQueuePanel({
                         {opportunities.map((opportunity) => {
                             const key = opportunityKey(opportunity);
                             const isSelected = key === selectedOpportunityKey;
+                            const healthValue = normalizeHealth((opportunity as OpportunityResult & { health?: string | null }).health);
 
                             return (
                                 <article key={key} className="row-item" data-testid="opportunity-item">
@@ -177,7 +187,7 @@ export default function OpportunityQueuePanel({
                                     </div>
 
                                     <p className="row-item__meta">
-                                        Direction: {opportunity.bias} · Stage: {opportunity.current_stage} · Health: {opportunity.health}
+                                        Direction: {opportunity.bias} · Stage: {opportunity.current_stage} · Health: {healthValue}
                                     </p>
                                     <p className="row-item__meta">
                                         Score: {opportunity.opportunity_score.toFixed(2)} · Institutional: {opportunity.institutional_score.toFixed(2)} · Execution: {opportunity.execution_quality.toFixed(2)}
@@ -188,8 +198,8 @@ export default function OpportunityQueuePanel({
                                     <p className="row-item__meta">{opportunity.decision_summary}</p>
 
                                     <div className="row-item__top" style={{ marginTop: "0.75rem" }}>
-                                        <span className={`status-chip status-chip--${toneFromHealth(opportunity.health)}`}>
-                                            {opportunity.health}
+                                        <span className={`status-chip status-chip--${toneFromHealth(healthValue)}`}>
+                                            {healthValue}
                                         </span>
                                         <button
                                             type="button"

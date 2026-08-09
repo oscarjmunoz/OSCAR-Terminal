@@ -36,7 +36,6 @@ const queue = [
         decision_summary: "Higher-timeframe confirmation still developing.",
         recommended_action: "WATCH",
         last_update: "2026-08-09T09:20:00Z",
-        health: "YELLOW",
     },
 ];
 
@@ -122,6 +121,7 @@ describe("OpportunityQueuePanel", () => {
 
     it("marks and inspects a selected opportunity without triggering execution logic", () => {
         const onInspect = vi.fn();
+        const onRefresh = vi.fn();
 
         render(
             <OpportunityQueuePanel
@@ -129,9 +129,12 @@ describe("OpportunityQueuePanel", () => {
                 marketSummary={marketSummary}
                 selectedOpportunityKey="EURUSD:M5"
                 onInspect={onInspect}
-                onRefresh={vi.fn()}
+                onRefresh={onRefresh}
             />
         );
+
+        expect(screen.getByText("Direction: BEARISH · Stage: EXECUTION_WINDOW · Health: GREEN")).toBeInTheDocument();
+        expect(screen.getByText("Direction: BULLISH · Stage: WAITING_MSS · Health: N/A")).toBeInTheDocument();
 
         const inspectButton = screen.getByRole("button", { name: "Inspect EURUSD M5" });
         const selectedItem = inspectButton.closest("[data-testid='opportunity-item']") as HTMLElement;
@@ -140,5 +143,7 @@ describe("OpportunityQueuePanel", () => {
         fireEvent.click(screen.getByRole("button", { name: "Inspect GBPUSD H1" }));
 
         expect(onInspect).toHaveBeenCalledWith(expect.objectContaining({ symbol: "GBPUSD", timeframe: "H1" }));
+        expect(onInspect).toHaveBeenCalledTimes(1);
+        expect(onRefresh).not.toHaveBeenCalled();
     });
 });
