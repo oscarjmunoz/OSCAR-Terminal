@@ -7,6 +7,7 @@ import { DecisionExecutionBridgeResult, executeDecisionBridge } from "../api/dec
 import { getOperationalReadiness, OperationalReadinessResponse } from "../api/health";
 import { getJournalEntries, JournalEntry } from "../api/journal";
 import { getStatus, getTick, TerminalStatus, TickResponse } from "../api/market";
+import { getOpportunityQueue, OpportunityQueueResponse, OpportunityResult } from "../api/opportunity";
 import { evaluatePlaybookMatches, getPlaybookSetups, PlaybookMatch, PlaybookSetup } from "../api/playbook";
 import { getOperationalSettings, OperationalSettings } from "../api/system";
 
@@ -14,6 +15,7 @@ import EmptyState from "../components/dashboard/EmptyState";
 import MetricCard from "../components/dashboard/MetricCard";
 import Panel from "../components/dashboard/Panel";
 import SelectorField from "../components/dashboard/SelectorField";
+import OpportunityQueuePanel from "../components/opportunity/OpportunityQueuePanel";
 import TradeTicket from "../components/execution/TradeTicket";
 
 type DashboardState = {
@@ -23,6 +25,8 @@ type DashboardState = {
     journalEntries: JournalEntry[];
     playbookSetups: PlaybookSetup[];
     performance: PerformanceReport | null;
+    opportunityQueue: OpportunityResult[];
+    opportunityQueueMarketSummary: OpportunityQueueResponse["market_summary"] | null;
 };
 
 const fallbackSettings: OperationalSettings = {
@@ -39,6 +43,8 @@ const initialState: DashboardState = {
     journalEntries: [],
     playbookSetups: [],
     performance: null,
+    opportunityQueue: [],
+    opportunityQueueMarketSummary: null,
 };
 
 const FAVORITES_STORAGE_KEY = "oscar.favoriteSymbols.v1";
@@ -144,6 +150,26 @@ function explainBridgeError(error: unknown): string {
     return "Decision execution bridge is unavailable right now.";
 }
 
+function explainOpportunityQueueError(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+        const detail = error.response?.data?.detail;
+
+        if (typeof detail === "string") {
+            return detail;
+        }
+
+        if (detail && typeof detail === "object" && typeof detail.message === "string") {
+            return detail.message;
+        }
+
+        if (!error.response) {
+            return "Opportunity queue could not be loaded from OSCAR.";
+        }
+    }
+
+    return "Opportunity queue is unavailable right now.";
+}
+
 function getInitialFavorites(symbols: string[]): string[] {
     if (typeof window === "undefined") {
         return symbols.slice(0, 3);
@@ -225,6 +251,10 @@ export default function Dashboard() {
     const [playbookMatches, setPlaybookMatches] = useState<PlaybookMatch[]>([]);
     const [decisionExecution, setDecisionExecution] = useState<DecisionExecutionBridgeResult | null>(null);
     const [decisionExecutionError, setDecisionExecutionError] = useState<string | null>(null);
+    const [selectedOpportunity, setSelectedOpportunity] = useState<OpportunityResult | null>(null);
+    const [opportunityQueueError, setOpportunityQueueError] = useState<string | null>(null);
+    const [opportunityQueueLoading, setOpportunityQueueLoading] = useState(true);
+    const [opportunityQueueRefreshing, setOpportunityQueueRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisProgress, setAnalysisProgress] = useState("Preparando workspace institucional.");
@@ -235,6 +265,29 @@ export default function Dashboard() {
 
     const initializedRef = useRef(false);
     const analysisRequestRef = useRef(0);
+    const suppressAutoAnalysisRef = useRef(false);
+
+    async function refreshOpportunityQueue() {
+        setOpportunityQueueRefreshing(true);
+        setOpportunityQueueError(null);
+
+        try {
+            const response = await getOpportunityQueue();
+
+            setState((previous) => ({
+                ...previous,
+                opportunityQueue: response.opportunity_queue,
+                opportunityQueueMarketSummary: response.market_summary,
+            }));
+        }
+        catch (error) {
+            setOpportunityQueueError(explainOpportunityQueueError(error));
+        }
+        finally {
+            setOpportunityQueueLoading(false);
+            setOpportunityQueueRefreshing(false);
+        }
+    }
 
     useEffect(() => {
         const initializedFavorites = getInitialFavorites(fallbackSettings.availableSymbols);
@@ -339,6 +392,16 @@ export default function Dashboard() {
         }
     }
 
+    function inspectOpportunity(opportunity: OpportunityResult) {
+        const key = `${opportunity.symbol}:${opportunity.timeframe}`;
+        setSelectedOpportunity(opportunity);
+        setSelectedSymbol(opportunity.symbol);
+        setSelectedTimeframe(opportunity.timeframe);
+        setAnalysisProgress(`Inspecting ${key} from the opportunity queue.`);
+        suppressAutoAnalysisRef.current = true;
+        void runAnalysis(opportunity.symbol, opportunity.timeframe);
+    }
+
     useEffect(() => {
         let cancelled = false;
 
@@ -350,12 +413,14 @@ export default function Dashboard() {
                     journalResult,
                     playbookSetupsResult,
                     performanceResult,
+                    opportunityQueueResult,
                 ] = await Promise.allSettled([
                     getOperationalSettings(),
                     getStatus(),
                     getJournalEntries(),
                     getPlaybookSetups(),
                     getAnalyticsPerformance(),
+                    getOpportunityQueue(),
                 ]);
 
                 if (cancelled) {
@@ -380,7 +445,12 @@ export default function Dashboard() {
                     journalEntries: settledValue(journalResult) ?? [],
                     playbookSetups: settledValue(playbookSetupsResult) ?? [],
                     performance: settledValue(performanceResult),
+                    opportunityQueue: settledValue(opportunityQueueResult)?.opportunity_queue ?? [],
+                    opportunityQueueMarketSummary: settledValue(opportunityQueueResult)?.market_summary ?? null,
                 });
+
+                setOpportunityQueueError(opportunityQueueResult.status === "rejected" ? explainOpportunityQueueError(opportunityQueueResult.reason) : null);
+                setOpportunityQueueLoading(false);
 
                 await runAnalysis(bootstrapSymbol, bootstrapTimeframe);
                 initializedRef.current = true;
@@ -408,6 +478,11 @@ export default function Dashboard() {
             return;
         }
 
+        if (suppressAutoAnalysisRef.current) {
+            suppressAutoAnalysisRef.current = false;
+            return;
+        }
+
         void runAnalysis(selectedSymbol, selectedTimeframe);
     }, [selectedSymbol, selectedTimeframe]);
 
@@ -430,6 +505,7 @@ export default function Dashboard() {
     }
 
     const currentSession = state.journalEntries[0]?.session ?? "N/A";
+    const selectedOpportunityKey = selectedOpportunity ? `${selectedOpportunity.symbol}:${selectedOpportunity.timeframe}` : null;
     const bestLiveMatch = playbookMatches[0] ?? null;
     const topSetupAnalytics = bestLiveMatch
         ? state.performance && state.performance.totalTrades > 0
@@ -448,6 +524,21 @@ export default function Dashboard() {
         <div className="app-shell">
             <main className="dashboard">
                 <div className="workspace-grid">
+                    <section className="workspace-zone workspace-zone--opportunity" data-testid="opportunity-panel">
+                        <OpportunityQueuePanel
+                            opportunities={state.opportunityQueue}
+                            marketSummary={state.opportunityQueueMarketSummary}
+                            selectedOpportunityKey={selectedOpportunityKey}
+                            isLoading={opportunityQueueLoading && loading}
+                            isRefreshing={opportunityQueueRefreshing}
+                            error={opportunityQueueError}
+                            onInspect={inspectOpportunity}
+                            onRefresh={() => {
+                                void refreshOpportunityQueue();
+                            }}
+                        />
+                    </section>
+
                     <section className="workspace-zone workspace-zone--bar" data-testid="trading-bar">
                         <div className="trading-bar__brand">
                             <span className="trading-bar__logo">OSCAR</span>

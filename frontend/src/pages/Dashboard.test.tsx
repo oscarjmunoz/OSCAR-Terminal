@@ -9,6 +9,7 @@ import { executeDecisionBridge } from "../api/decisionExecution";
 import { getOperationalReadiness } from "../api/health";
 import { getJournalEntries } from "../api/journal";
 import { getStatus, getTick } from "../api/market";
+import { getOpportunityQueue } from "../api/opportunity";
 import { evaluatePlaybookMatches, getPlaybookSetups } from "../api/playbook";
 import { getOperationalSettings } from "../api/system";
 
@@ -27,6 +28,10 @@ vi.mock("../api/decisionExecution", () => ({
 vi.mock("../api/market", () => ({
     getStatus: vi.fn(),
     getTick: vi.fn(),
+}));
+
+vi.mock("../api/opportunity", () => ({
+    getOpportunityQueue: vi.fn(),
 }));
 
 vi.mock("../api/health", () => ({
@@ -105,6 +110,8 @@ const liveDecisionReport = {
         recommendation: "WAIT",
         explanation: "Context is bearish, but execution still requires confirmation.",
     },
+    timeframe: "M5",
+    dispatch: false,
     narrative: "Live bearish context with partial confluence. Decision remains with the trader.",
     multi_timeframe_bias: {
         h4: { timeframe: "H4", bias: "BULLISH", bos: false, choch: false, mss: false, structure_confidence: "HIGH", data_availability: "AVAILABLE", explanation: "Higher timeframe structure remains bullish." },
@@ -171,6 +178,54 @@ const journalEntry = {
     closeReason: null,
     personalNotes: "Execution was clean.",
     tags: ["A+", "LONDON"],
+};
+
+const opportunityQueueResponse = {
+    market_summary: {
+        total_assets: 2,
+        ignored: 0,
+        watching: 1,
+        preparing: 0,
+        ready: 1,
+        active: 0,
+        last_scan: "2026-08-09T09:30:00Z",
+    },
+    opportunity_queue: [
+        {
+            symbol: "EURUSD",
+            timeframe: "M5",
+            bias: "BEARISH",
+            structure: "BEARISH|BOS=1|CHOCH=0|MSS=1",
+            liquidity_target: "SELL_SIDE_LIQUIDITY",
+            current_stage: "EXECUTION_WINDOW",
+            opportunity_score: 88.45,
+            institutional_score: 79.2,
+            execution_quality: 74.3,
+            priority: "HIGH",
+            estimated_eta: "NOW",
+            decision_summary: "Bearish structure with execution window available.",
+            recommended_action: "READY",
+            last_update: "2026-08-09T09:30:00Z",
+            health: "GREEN",
+        },
+        {
+            symbol: "GBPUSD",
+            timeframe: "H1",
+            bias: "BULLISH",
+            structure: "BULLISH|BOS=0|CHOCH=1|MSS=0",
+            liquidity_target: "BUY_SIDE_LIQUIDITY",
+            current_stage: "WAITING_MSS",
+            opportunity_score: 61.2,
+            institutional_score: 58.4,
+            execution_quality: 49.8,
+            priority: "MEDIUM",
+            estimated_eta: "30_60_MIN",
+            decision_summary: "Higher-timeframe confirmation still developing.",
+            recommended_action: "WATCH",
+            last_update: "2026-08-09T09:20:00Z",
+            health: "YELLOW",
+        },
+    ],
 };
 
 const readiness = {
@@ -297,6 +352,7 @@ beforeEach(() => {
     vi.mocked(getLiveDecisionReport).mockResolvedValue(liveDecisionReport);
     vi.mocked(executeDecisionBridge).mockResolvedValue(decisionExecutionBridge as never);
     vi.mocked(getJournalEntries).mockResolvedValue([journalEntry]);
+    vi.mocked(getOpportunityQueue).mockResolvedValue(opportunityQueueResponse as never);
     vi.mocked(getPlaybookSetups).mockResolvedValue([
         {
             id: "setup-1",
@@ -347,6 +403,8 @@ describe("Dashboard", () => {
         expect(within(decisionPanel).getByText("68.40%")).toBeInTheDocument();
 
         expect(screen.getByTestId("trading-bar")).toBeInTheDocument();
+        expect(screen.getByTestId("opportunity-panel")).toHaveTextContent("Opportunity Queue");
+        expect(screen.getByTestId("opportunity-panel")).toHaveTextContent("EURUSD · M5");
         expect(screen.getByTestId("market-snapshot")).toHaveTextContent("Institutional Score");
         expect(screen.getByTestId("multitimeframe-panel")).toHaveTextContent("Multi-Timeframe Bias");
         expect(screen.getByTestId("playbook-panel")).toHaveTextContent("London Breakout");
@@ -388,6 +446,24 @@ describe("Dashboard", () => {
             dispatch: false,
             timeframe: "M5",
         });
+    });
+
+    it("inspects an opportunity without triggering paper execution or confirmation", async () => {
+        render(<Dashboard />);
+
+        await screen.findByTestId("opportunity-panel");
+
+        fireEvent.click(screen.getByRole("button", { name: "Inspect GBPUSD H1" }));
+
+        await waitFor(() => {
+            expect(getLiveDecisionReport).toHaveBeenCalledWith("GBPUSD", "H1");
+        });
+
+        expect(executeDecisionBridge).toHaveBeenCalledWith(expect.objectContaining({
+            dispatch: false,
+            timeframe: "H1",
+        }));
+        expect(vi.mocked(executeDecisionBridge).mock.calls.every(([payload]) => payload?.confirmed !== true)).toBe(true);
     });
 
     it("activates focus mode and hides non-essential zones", async () => {
